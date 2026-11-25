@@ -22,8 +22,6 @@ export interface ExtractedContent {
 	[key: string]: string;
 }
 
-export type FilterFunction = (value: string, param?: string) => string | any[];
-
 export interface PromptVariable {
 	key: string;
 	prompt: string;
@@ -72,6 +70,21 @@ export interface ReaderSettings {
 
 export interface Settings {
 	vaults: string[];
+	/**
+	 * Base URL of Chronicle's local ingest listener, e.g. http://127.0.0.1:4580.
+	 * The ingest token is not stored here: it is fetched from the listener's
+	 * /ingest/config on demand (see utils/chronicle-connection.ts).
+	 */
+	chronicleUrl: string;
+	/** Waar clips naartoe gaan: Chronicle (standaard) of Zett. */
+	clipDestination: 'chronicle' | 'zett';
+	/**
+	 * Basis-URL van Zett's lokale luisteraar, bijvoorbeeld http://127.0.0.1:4590.
+	 * Het token staat hier niet: het wordt op aanvraag opgehaald (zie utils/zett-note-creator.ts).
+	 */
+	zettUrl: string;
+	/** Beelden van de pagina door Zett laten bewaren in plaats van als hotlink te laten staan. */
+	archiveImages: boolean;
 	showMoreActionsButton: boolean;
 	betaFeatures: boolean;
 	legacyMode: boolean;
@@ -93,6 +106,7 @@ export interface Settings {
 		saveFile: number;
 		copyToClipboard: number;
 		share: number;
+		readerMode: number;
 	};
 	history: HistoryEntry[];
 	ratings: Rating[];
@@ -110,7 +124,7 @@ export interface ModelConfig {
 export interface HistoryEntry {
 	datetime: string;
 	url: string;
-	action: 'addToObsidian' | 'saveFile' | 'copyToClipboard' | 'share';
+	action: 'addToObsidian' | 'saveFile' | 'copyToClipboard' | 'share' | 'readerMode';
 	title?: string;
 	vault?: string;
 	path?: string;

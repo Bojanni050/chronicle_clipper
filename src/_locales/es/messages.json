@@ -286,7 +286,7 @@
 		"message": "Guarda contenido web en un formato privado y duradero al que puedes acceder sin conexión. La extensión oficial para Obsidian."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Zett Web Clipper"
 	},
 	"failedToCopyText": {
 		"message": "Error al copiar el texto"
@@ -602,6 +602,12 @@
 	"pageVariables": {
 		"message": "Variables de página"
 	},
+	"pagesRead": {
+		"message": "página leída"
+	},
+	"pagesReadPlural": {
+		"message": "páginas leídas"
+	},
 	"pagesSaved": {
 		"message": "página guardada"
 	},
@@ -709,6 +715,9 @@
 	},
 	"rateExtensionDescription": {
 		"message": "¿Estás disfrutando de Web Clipper? Ayúdanos dándole una calificación."
+	},
+	"read": {
+		"message": "Leídas"
 	},
 	"reader": {
 		"message": "Lector"
@@ -910,6 +919,9 @@
 	},
 	"saveBehaviorLabel": {
 		"message": "Comportamiento de guardado"
+	},
+	"saved": {
+		"message": "Guardadas"
 	},
 	"saveFile": {
 		"message": "Guardar archivo..."

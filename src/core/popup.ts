@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import { Template, Property, PromptVariable } from '../types/types';
 import { incrementStat, addHistoryEntry, getClipHistory } from '../utils/storage-utils';
 import { generateFrontmatter, saveToObsidian } from '../utils/obsidian-note-creator';
+import { saveClip, clipButtonLabel } from '../utils/clip-destination';
 import { extractPageContent, initializePageContent } from '../utils/content-extractor';
 import { compileTemplate } from '../utils/template-compiler';
 import { initializeIcons, getPropertyTypeIcon } from '../icons/icons';
@@ -14,10 +15,11 @@ import { addBrowserClassToHtml, detectBrowser } from '../utils/browser-detection
 import { createElementWithClass } from '../utils/dom-utils';
 import { initializeInterpreter, handleInterpreterUI, collectPromptVariables } from '../utils/interpreter';
 import { adjustNoteNameHeight } from '../utils/ui-utils';
-import { debugLog } from '../utils/debug';
+import { debugLog, isDebugMode } from '../utils/debug';
 import { showVariables, initializeVariablesPanel, updateVariablesPanel } from '../managers/inspect-variables';
 import { isBlankPage, isValidUrl, isRestrictedUrl } from '../utils/active-tab-manager';
 import { memoizeWithExpiration } from '../utils/memoize';
+import { mediaSummary } from '../utils/media-archive';
 import { debounce } from '../utils/debounce';
 import { sanitizeFileName } from '../utils/string-utils';
 import { saveFile } from '../utils/file-utils';
@@ -617,6 +619,32 @@ function showError(messageKey: string): void {
 		document.body.classList.add('has-error');
 	}
 }
+/**
+ * Chronicle failures are retryable (app not running, stale token, 4xx) and
+ * the popup must stay usable, so they get an inline line instead of the
+ * full-page error that showError() swaps in.
+ */
+function showClipError(message: string): void {
+	const status = document.getElementById('clip-status');
+	if (!status) {
+		showError(message);
+		return;
+	}
+	status.textContent = message;
+	status.style.display = 'block';
+	setTimeout(() => {
+		status.style.display = 'none';
+	}, 12000);
+}
+
+function clearClipError(): void {
+	const status = document.getElementById('clip-status');
+	if (status) {
+		status.textContent = '';
+		status.style.display = 'none';
+	}
+}
+
 function clearError(): void {
 	const errorMessage = document.querySelector('.error-message') as HTMLElement;
 	const clipper = document.querySelector('.clipper') as HTMLElement;
@@ -967,8 +995,10 @@ async function fillTemplateFieldValues(currentTabId: number, template: Template 
 		}
 	}
 
-	const replacedTemplate = await getReplacedTemplate(template, variables, currentTabId!, currentUrl);
-	debugLog('Variables', 'Current template with replaced variables:', JSON.stringify(replacedTemplate, null, 2));
+	if (isDebugMode()) {
+		const replacedTemplate = await getReplacedTemplate(template, variables, currentTabId!, currentUrl);
+		debugLog('Variables', 'Current template with replaced variables:', JSON.stringify(replacedTemplate, null, 2));
+	}
 }
 
 function setupMetadataToggle() {
@@ -1301,7 +1331,7 @@ function determineMainAction() {
 			addSecondaryAction(secondaryActions, 'copyToClipboard', copyContent);
 			break;
 		default: // 'addToObsidian'
-			mainButton.textContent = getMessage('addToObsidian');
+			mainButton.textContent = clipButtonLabel(getMessage('addToObsidian'));
 			mainButton.onclick = () => handleClipObsidian();
 			// Add direct actions to secondary
 			addSecondaryAction(secondaryActions, 'copyToClipboard', copyContent);
@@ -1311,6 +1341,7 @@ function determineMainAction() {
 
 async function handleClipObsidian(): Promise<void> {
 	if (!currentTemplate) return;
+	clearClipError();
 
 	const vaultDropdown = document.getElementById('vault-select') as HTMLSelectElement;
 	const noteContentField = document.getElementById('note-content-field') as HTMLTextAreaElement;
@@ -1340,25 +1371,38 @@ async function handleClipObsidian(): Promise<void> {
 		const frontmatter = await generateFrontmatter(properties);
 		const fileContent = frontmatter + noteContentField.value;
 
-		// Save to Obsidian
+		// Save to Chronicle (was: Obsidian). Vault/path/behavior are Obsidian
+		// vault concepts that don't apply to a single ingest endpoint, so they
+		// stay unused here rather than removed from the UI — see
+		// clipper/CHRONICLE-FORK.md for what's forked vs. untouched.
 		const selectedVault = vaultDropdown.value || currentTemplate.vault || '';
 		const isDailyNote = currentTemplate.behavior === 'append-daily' || currentTemplate.behavior === 'prepend-daily';
 		const noteName = isDailyNote ? '' : noteNameField?.value || '';
 		const path = isDailyNote ? '' : pathField?.value || '';
 
-		await saveToObsidian(fileContent, noteName, path, selectedVault, currentTemplate.behavior);
 		const tabInfo = await getCurrentTabInfo();
+		// De beelden horen bij de clip: Zett haalt ze op, bewaart ze en de Markdown verwijst naar
+		// de hash in plaats van naar de hotlink. Mislukt er een, dan blijft dat zichtbaar.
+		const pageHtml = currentTabId !== undefined
+			? (await memoizedExtractPageContent(currentTabId).catch(() => null))?.fullHtml
+			: undefined;
+		const clipResult = await saveClip(fileContent, noteName, tabInfo.url, pageHtml);
+		const hasMediaLine = !!clipResult && clipResult.archived + clipResult.failed > 0;
+		if (clipResult && hasMediaLine) {
+			showClipError(mediaSummary(clipResult.archived, clipResult.failed));
+		}
 		await incrementStat('addToObsidian', selectedVault, path, tabInfo.url, tabInfo.title);
 
 		lastSelectedVault = selectedVault;
 		await setLocalStorage('lastSelectedVault', lastSelectedVault);
 
 		if (!isSidePanel) {
-			setTimeout(() => window.close(), 500);
+			// Met een regel over de beelden eronder blijft de popup even staan, zodat die te lezen is.
+			setTimeout(() => window.close(), hasMediaLine ? 2500 : 500);
 		}
 	} catch (error) {
 		console.error('Error in handleClipObsidian:', error);
-		showError('failedToSaveFile');
+		showClipError(error instanceof Error && error.message ? error.message : getMessage('failedToSaveFile'));
 		throw error;
 	}
 }

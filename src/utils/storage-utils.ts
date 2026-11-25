@@ -1,12 +1,15 @@
 import browser from './browser-polyfill';
 import { Settings, ModelConfig, PropertyType, HistoryEntry, Provider, Rating } from '../types/types';
 import { debugLog } from './debug';
-import { copyToClipboard } from 'core/popup';
 
 export type { Settings, ModelConfig, PropertyType, HistoryEntry, Provider, Rating };
 
 export let generalSettings: Settings = {
 	vaults: [],
+	chronicleUrl: 'http://127.0.0.1:4580',
+	clipDestination: 'chronicle',
+	zettUrl: 'http://127.0.0.1:4590',
+	archiveImages: true,
 	betaFeatures: false,
 	legacyMode: false,
 	silentOpen: false,
@@ -43,7 +46,8 @@ export let generalSettings: Settings = {
 		addToObsidian: 0,
 		saveFile: 0,
 		copyToClipboard: 0,
-		share: 0
+		share: 0,
+		readerMode: 0
 	},
 	history: [],
 	ratings: [],
@@ -66,6 +70,14 @@ interface StorageData {
 		silentOpen?: boolean;
 		openBehavior?: boolean | 'popup' | 'embedded';
 		saveBehavior?: 'addToObsidian' | 'copyToClipboard' | 'saveFile';
+		chronicleUrl?: string;
+		clipDestination?: 'chronicle' | 'zett' | 'mindstack' | 'mindloom';
+		zettUrl?: string;
+		/** Beelden van de pagina door Zett laten bewaren (standaard aan). */
+		archiveImages?: boolean;
+		/** Oude namen, vóór de rebrandings; alleen nog gelezen. */
+		mindstackUrl?: string;
+		mindloomUrl?: string;
 	};
 	vaults?: string[];
 	highlighter_settings?: {
@@ -104,6 +116,7 @@ interface StorageData {
 		saveFile: number;
 		copyToClipboard: number;
 		share: number;
+		readerMode?: number;
 	};
 	history?: HistoryEntry[];
 	ratings?: Rating[];
@@ -118,6 +131,10 @@ export async function loadSettings(): Promise<Settings> {
 	// Load default settings first
 	const defaultSettings: Settings = {
 		vaults: [],
+		chronicleUrl: 'http://127.0.0.1:4580',
+		clipDestination: 'chronicle',
+		zettUrl: 'http://127.0.0.1:4590',
+		archiveImages: true,
 		showMoreActionsButton: false,
 		betaFeatures: false,
 		legacyMode: false,
@@ -155,7 +172,8 @@ export async function loadSettings(): Promise<Settings> {
 			addToObsidian: 0,
 			saveFile: 0,
 			copyToClipboard: 0,
-			share: 0
+			share: 0,
+			readerMode: 0
 		},
 		history: [],
 		ratings: [],
@@ -179,6 +197,13 @@ export async function loadSettings(): Promise<Settings> {
 	// Load user settings
 	const loadedSettings: Settings = {
 		vaults: sanitizedVaults.length > 0 ? sanitizedVaults : defaultSettings.vaults,
+		chronicleUrl: data.general_settings?.chronicleUrl || defaultSettings.chronicleUrl,
+		// 'mindstack' en 'mindloom' zijn de opgeslagen waarden van vóór de rebrandings.
+		clipDestination: ['zett', 'mindloom', 'mindstack'].includes(data.general_settings?.clipDestination ?? '')
+			? 'zett'
+			: 'chronicle',
+		zettUrl: data.general_settings?.zettUrl || data.general_settings?.mindloomUrl || data.general_settings?.mindstackUrl || defaultSettings.zettUrl,
+		archiveImages: data.general_settings?.archiveImages ?? defaultSettings.archiveImages,
 		showMoreActionsButton: data.general_settings?.showMoreActionsButton ?? defaultSettings.showMoreActionsButton,
 		betaFeatures: data.general_settings?.betaFeatures ?? defaultSettings.betaFeatures,
 		legacyMode: data.general_settings?.legacyMode ?? defaultSettings.legacyMode,
@@ -213,7 +238,7 @@ export async function loadSettings(): Promise<Settings> {
 			highlightActiveLine: data.reader_settings?.highlightActiveLine ?? defaultSettings.readerSettings.highlightActiveLine,
 			customCss: data.reader_settings?.customCss ?? defaultSettings.readerSettings.customCss
 		},
-		stats: data.stats || defaultSettings.stats,
+		stats: { ...defaultSettings.stats, ...data.stats },
 		history: data.history || defaultSettings.history,
 		ratings: data.ratings || defaultSettings.ratings,
 		saveBehavior: data.general_settings?.saveBehavior ?? defaultSettings.saveBehavior
@@ -238,6 +263,9 @@ export async function saveSettings(settings?: Partial<Settings>): Promise<void> 
 			silentOpen: generalSettings.silentOpen,
 			openBehavior: generalSettings.openBehavior,
 			saveBehavior: generalSettings.saveBehavior,
+			chronicleUrl: generalSettings.chronicleUrl,
+			clipDestination: generalSettings.clipDestination,
+			zettUrl: generalSettings.zettUrl,
 		},
 		highlighter_settings: {
 			highlighterEnabled: generalSettings.highlighterEnabled,

@@ -286,7 +286,7 @@
 		"message": "محتوای وب را در قالبی خصوصی و بادوام ذخیره کنید که بتوانید به صورت آفلاین به آن دسترسی داشته باشید. پسوند رسمی مرورگر برای ابسیدین."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Zett Web Clipper"
 	},
 	"failedToCopyText": {
 		"message": "متن کپی نشد"
@@ -602,6 +602,12 @@
 	"pageVariables": {
 		"message": "متغیرهای صفحه"
 	},
+	"pagesRead": {
+		"message": "صفحه خوانده شد"
+	},
+	"pagesReadPlural": {
+		"message": "صفحات خوانده شدند"
+	},
 	"pagesSaved": {
 		"message": "صفحه ذخیره شد"
 	},
@@ -709,6 +715,9 @@
 	},
 	"rateExtensionDescription": {
 		"message": "آیا از وب کلیپر لذت می برید؟ با ارزیابی آن به ما کمک کنید."
+	},
+	"read": {
+		"message": "خوانده‌شده"
 	},
 	"reader": {
 		"message": "خواننده"
@@ -910,6 +919,9 @@
 	},
 	"saveBehaviorLabel": {
 		"message": "رفتار ذخیره سازی"
+	},
+	"saved": {
+		"message": "ذخیره‌شده"
 	},
 	"saveFile": {
 		"message": "ذخیره فایل..."

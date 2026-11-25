@@ -18,7 +18,7 @@
 		"message": "Provider toevoegen"
 	},
 	"addToObsidian": {
-		"message": "Toevoegen aan Obsidian"
+		"message": "Toevoegen aan Chronicle"
 	},
 	"addVaultPlaceholder": {
 		"message": "Druk op Enter om een kluis toe te voegen"
@@ -286,7 +286,7 @@
 		"message": "Sla webinhoud op in een privé en duurzaam formaat dat je offline kunt bekijken. De officiële browserextensie voor Obsidian."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Zett Web Clipper"
 	},
 	"failedToCopyText": {
 		"message": "Tekst kopiëren mislukt"
@@ -602,6 +602,12 @@
 	"pageVariables": {
 		"message": "Paginavariabelen"
 	},
+	"pagesRead": {
+		"message": "pagina gelezen"
+	},
+	"pagesReadPlural": {
+		"message": "pagina's gelezen"
+	},
 	"pagesSaved": {
 		"message": "pagina opgeslagen"
 	},
@@ -709,6 +715,9 @@
 	},
 	"rateExtensionDescription": {
 		"message": "Geniet u van Web Clipper? Help ons door het een beoordeling te geven."
+	},
+	"read": {
+		"message": "Gelezen"
 	},
 	"reader": {
 		"message": "Lezer"
@@ -911,6 +920,9 @@
 	"saveBehaviorLabel": {
 		"message": "Opslaggedrag"
 	},
+	"saved": {
+		"message": "Opgeslagen"
+	},
 	"saveFile": {
 		"message": "Bestand opslaan..."
 	},
@@ -1079,6 +1091,12 @@
 				"content": "<strong>"
 			}
 		}
+	},
+	"archiveImages": {
+		"message": "Bewaar de afbeeldingen van de pagina in Zett"
+	},
+	"archiveImagesDescription": {
+		"message": "Haalt de afbeeldingen van de pagina op en laat Zett ze bewaren, zodat een beeld niet verdwijnt als de pagina verdwijnt. Wat niet op te halen is, wordt als gat gemeld met de reden (bijvoorbeeld HTTP 403)."
 	},
 	"version": {
 		"message": "Versie"

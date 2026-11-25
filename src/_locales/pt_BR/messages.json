@@ -286,7 +286,7 @@
 		"message": "Salve o conteúdo da internet em um formato privado e durável, que pode ser acessado off-line. A extensão de navegador oficial do Obsidian."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Zett Web Clipper"
 	},
 	"failedToCopyText": {
 		"message": "Falha ao copiar o texto"
@@ -602,6 +602,12 @@
 	"pageVariables": {
 		"message": "Variáveis da página"
 	},
+	"pagesRead": {
+		"message": "página lida"
+	},
+	"pagesReadPlural": {
+		"message": "páginas lidas"
+	},
 	"pagesSaved": {
 		"message": "página salva"
 	},
@@ -709,6 +715,9 @@
 	},
 	"rateExtensionDescription": {
 		"message": "Você está gostando do Web Clipper? Ajude-nos dando uma avaliação."
+	},
+	"read": {
+		"message": "Lidas"
 	},
 	"reader": {
 		"message": "Leitor"
@@ -910,6 +919,9 @@
 	},
 	"saveBehaviorLabel": {
 		"message": "Comportamento de salvamento"
+	},
+	"saved": {
+		"message": "Salvas"
 	},
 	"saveFile": {
 		"message": "Salvar arquivo..."

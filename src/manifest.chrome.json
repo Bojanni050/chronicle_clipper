@@ -1,10 +1,10 @@
 {
 	"manifest_version": 3,
 	"default_locale": "en",
-	"name": "Obsidian Web Clipper",
-	"homepage_url": "https://obsidian.md/",
-	"version": "1.7.1",
-	"description": "Save and highlight web pages in a private and durable format that you can access offline. The official extension for Obsidian.",
+	"name": "Zett Web Clipper",
+	"homepage_url": "https://github.com/obsidianmd/obsidian-clipper",
+	"version": "1.7.1.4",
+	"description": "Fork van Obsidian's officiele Web Clipper, omgebouwd om naar Chronicle (Chronicle-Gaia) of Zett te sturen in plaats van Obsidian. Zie clipper/CHRONICLE-FORK.md.",
 	"permissions": [
 		"activeTab",
 		"clipboardWrite",
@@ -41,7 +41,7 @@
 	"content_scripts": [
 		{
 			"matches": ["http://*/*", "https://*/*"],
-			"js": ["browser-polyfill.min.js", "content.js"]
+			"js": ["content-loader.js"]
 		}
 	],
 	"web_accessible_resources": [

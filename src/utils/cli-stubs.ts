@@ -8,6 +8,11 @@ export default {} as any;
 
 export const generalSettings: Settings = {
 	vaults: [],
+	chronicleUrl: 'http://127.0.0.1:4580',
+	clipDestination: 'chronicle',
+	zettUrl: 'http://127.0.0.1:4590',
+	// De CLI knipt zonder browser: er valt geen beeld op te halen.
+	archiveImages: false,
 	betaFeatures: false,
 	legacyMode: false,
 	silentOpen: false,
@@ -45,6 +50,7 @@ export const generalSettings: Settings = {
 		saveFile: 0,
 		copyToClipboard: 0,
 		share: 0,
+		readerMode: 0,
 	},
 	history: [],
 	ratings: [],

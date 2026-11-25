@@ -286,7 +286,7 @@
 		"message": "Gem webindhold i et privat og holdbart format, tilgængeligt offline. Den officielle browserudvidelse til Obsidian."
 	},
 	"extensionName": {
-		"message": "Obsidian Web Clipper"
+		"message": "Zett Web Clipper"
 	},
 	"failedToCopyText": {
 		"message": "Kunne ikke kopiere tekst"
@@ -594,6 +594,12 @@
 	"pageVariables": {
 		"message": "Sidevariabler"
 	},
+	"pagesRead": {
+		"message": "Side læst"
+	},
+	"pagesReadPlural": {
+		"message": "Sider læst"
+	},
 	"pagesSaved": {
 		"message": "Side gemt"
 	},
@@ -701,6 +707,9 @@
 	},
 	"rateExtensionDescription": {
 		"message": "Kan du lide Web Clipper? Hjælp os ved at give en bedømmelse."
+	},
+	"read": {
+		"message": "Læst"
 	},
 	"reader": {
 		"message": "Læser"
@@ -902,6 +911,9 @@
 	},
 	"saveBehaviorLabel": {
 		"message": "Gem adfærd"
+	},
+	"saved": {
+		"message": "Gemt"
 	},
 	"saveFile": {
 		"message": "Gem fil..."

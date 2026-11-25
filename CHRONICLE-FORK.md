@@ -1,0 +1,131 @@
+# Chronicle-fork van obsidian-clipper
+
+Dit is een fork van [obsidianmd/obsidian-clipper](https://github.com/obsidianmd/obsidian-clipper)
+(MIT-licentie, vertrokken vanaf versie 1.7.1), met de save-stap omgebouwd naar een eigen
+bestemming in plaats van Obsidian. Sinds 25 november 2026 staat de clipper in zijn eigen repo,
+[`Bojanni050/chronicle_clipper`](https://github.com/Bojanni050/chronicle_clipper); daarvoor was
+het de map `clipper/` in `Chronicle-Gaia`. De geschiedenis van de upstream staat eronder
+(`git log 1.7.1`, remote `upstream`), zodat een latere versie van de clipper te mergen is.
+De content-extractie (Defuddle, inclusief `flatten-shadow-dom.js`), de popup-UI, templates,
+highlighter en reader-mode zijn onaangeroerd — dat was precies het punt: hun extractie is
+rijper dan wat `plugin/content/webclip.js` zelf doet.
+
+## Wat is gewijzigd
+
+- **`src/utils/chronicle-note-creator.ts`** (nieuw) — `saveToChronicle(fileContent, noteName, url)`
+  POST't naar Chronicle's lokale ingest-listener (`{chronicleUrl}/ingest/chat`), met dezelfde
+  payload-vorm (`content`, `title`, `url`, `sourceProvider: 'web'`, `occurredAt`) als
+  `plugin/service-worker.js` al gebruikt, plus `object: 'web'` en `source: <url>`: Chronicle
+  slaat een clip op als **web-object** (ItemType.WEB) met de pagina-URL als bron, in plaats van
+  als chat. Foundation krijgt hem nog steeds als chat-capture (daar bestaat geen web-type).
+  Analoog aan `saveToObsidian()` in `src/utils/obsidian-note-creator.ts`, die ongewijzigd is
+  gebleven.
+- **`src/utils/chronicle-connection.ts`** (nieuw) — haalt URL én ingest-token op bij de app
+  via `GET /ingest/config` (nieuw endpoint in `services/ingest-listener.js`). Het token wordt
+  bewust **niet** bewaard: `general_settings` staat in `storage.sync`, en een ingest-token is
+  per machine. De verbinding leeft in het geheugen van de extensie; na een 401 (app herstart
+  met een nieuw token) wordt de cache gewist en volgt één retry.
+- **`src/core/popup.ts`** — `handleClipObsidian()` roept nu `saveToChronicle(...)` i.p.v.
+  `saveToObsidian(...)`. Vault/pad/behavior (Obsidian-vaultconcepten) zitten nog in de code
+  maar zijn verborgen (`.vault-path-container { display: none !important }` in
+  `styles/popup.scss`, want de JS zet inline `display: flex`), en worden alleen nog gebruikt
+  voor `incrementStat`
+  (de ingebouwde gebruiksstatistieken, verder ongemoeid). CLI-fouten komen nu in een
+  inline regel (`#clip-status`) i.p.v. de popup te vervangen door "failed to save file",
+  zodat een niet-draaiende app of een 4xx leesbaar is en de knop bruikbaar blijft.
+- **`src/types/types.ts`, `src/utils/storage-utils.ts`, `src/utils/cli-stubs.ts`** —
+  één nieuwe setting: `chronicleUrl` (default `http://127.0.0.1:4580`). Geen
+  `chronicleToken` meer in de settings.
+- **`src/settings.html`, `src/managers/general-settings.ts`** — een "Chronicle"-sectie met
+  een URL-veld, een statusregel en een knop **Test verbinding**. De status wordt bij het
+  openen van de instellingen automatisch gepeild.
+- **`src/manifest.chrome.json`** — naam/omschrijving/versie aangepast zodat de extensie
+  herkenbaar is naast de bestaande "Chronicle Chat Exporter" (`plugin/`); permissies
+  ongewijzigd.
+
+## Niet gewijzigd (bewust)
+
+- Alle content-extractie, templates, highlighter, reader-mode — puur cosmetisch, functioneel
+  onveranderd. De i18n-strings zijn ongewijzigd, behalve het hoofdknoplabel: `addToObsidian`
+  heet in `nl` en `en` nu "Toevoegen aan Chronicle" / "Add to Chronicle". De overige
+  tientallen locales zeggen nog "Obsidian"; die zie je alleen als je browser op zo'n taal staat,
+  en de sleutelnaam `addToObsidian` is intern gebleven om de templates niet te raken.
+- `host_permissions: ["<all_urls>", ...]` — deze extensie draait (anders dan `plugin/`'s
+  activeTab-aanpak) een altijd-geladen content script op elke pagina (voor highlighter/reader
+  mode). Dat is een bewust bredere permissie-voetafdruk dan de minimale aanpak in
+  `plugin/content/webclip.js` — een expliciete trade-off voor de rijkere extractie.
+
+## Build
+
+```
+cd clipper
+npm install
+npm run build:chrome   # -> clipper/dist/ en clipper/builds/*.zip
+```
+
+Laad `clipper/dist/` als "Uitgepakte extensie" via `chrome://extensions`. Verdere configuratie
+is niet nodig: de extensie vraagt de listener-URL en het ingest-token zelf op bij de draaiende
+Chronicle-app (`GET /ingest/config`). Draait de app niet, dan zegt de popup dat bij de knop.
+De Chronicle-sectie in de extensie-instellingen toont de verbindingsstatus en heeft een knop
+**Test verbinding**; alleen de URL is handmatig aan te passen (voor een afwijkende poort).
+
+`GET /ingest/config` is bewust smal: alleen loopback-Host (`127.0.0.1`, `localhost`, `::1`),
+alleen een browser-extensie-Origin, en nooit een CORS-header. Een webpagina kan het antwoord
+dus niet lezen; een ander lokaal proces kan dat wel — net als het `foundation.local.json` op
+deze machine. Zonder dat endpoint zou de gebruiker het token alsnog met de hand moeten plakken.
+
+De manifestversie is `1.7.1.4` (Chrome accepteert alleen 1–4 puntgescheiden integers; de
+eerdere `1.7.1-chronicle.1` zou bij het laden geweigerd zijn).
+
+## Bekende afwijking buiten deze fork
+
+`npx vitest run` faalt op 9 testbestanden met `Cannot find package 'webextension-polyfill'`,
+terwijl het package wél in `node_modules` staat en de echte `webpack`-build het probleemloos
+oplost. Dit is een Vite/Vitest-resolutiequirk van de upstream-testinfrastructuur, niet iets
+dat door deze fork is veroorzaakt — de 139 individuele tests die wél draaiden, slaagden
+allemaal.
+
+## Tweede bestemming: Zett
+
+Naast Chronicle kan de clipper ook naar **Zett** sturen, de notitie-app op `K:\Projects\CapacitiesDev`. Chronicle blijft de standaard, dus bestaande installaties merken niets.
+
+- **`src/utils/zett-note-creator.ts`** (nieuw) combineert wat `chronicle-connection.ts` en `chronicle-note-creator.ts` doen, voor Zett's luisteraar (`127.0.0.1:4590`): `GET /ingest/config` voor URL en token (alleen in het geheugen, na een 401 opnieuw opgehaald), `POST /ingest/clip` met een Bearer-token. Hij controleert dat het antwoord `app: "zett"` zegt, zodat een clip nooit per ongeluk naar Chronicle of een andere app gaat.
+- **`src/utils/clip-destination.ts`** (nieuw) kiest de bestemming (`saveClip`) en de tekst van de hoofdknop (`clipButtonLabel`).
+- **`src/core/popup.ts`**: `saveToChronicle(...)` werd `saveClip(...)`, en de hoofdknop zegt "Toevoegen aan Zett" als dat de bestemming is. Verder niets.
+- **Instellingen**: `clipDestination` (`chronicle` of `zett`, standaard `chronicle`) en `zettUrl` in `types.ts`, `storage-utils.ts`, `cli-stubs.ts`; in `settings.html` en `general-settings.ts` een sectie "Bestemming" en een sectie "Zett" met een URL-veld, een statusregel en **Test verbinding**.
+- **Zett-kant**: zet in Zett onder Instellingen, tabblad **Web clipper**, de optie aan (standaard aan). Details van de luisteraar staan in `docs/api-contract.md`, sectie 12, van Zett.
+- **Tests**: `zett-note-creator.test.ts` en `clip-destination.test.ts` (16 tests). De 9 bestaande mislukte testbestanden (het `webextension-polyfill`-probleem hierboven) zijn onveranderd.
+- **Overnemen**: bouw met `npm run build:chrome` en herlaad de extensie in `chrome://extensions`. Kies daarna in de extensie-instellingen bij **Bestemming** voor Zett.
+- **Rebrandings (2026-11-18)**: de app heette eerst Mindstack, daarna Mindloom, nu Zett. De oude opgeslagen waarden `clipDestination: 'mindstack'`/`'mindloom'` en de oude sleutels `mindstackUrl`/`mindloomUrl` worden nog gelezen, zodat een bestaande installatie haar keuze en URL houdt.
+- **Naam van de extensie (2026-11-18)**: de extensie heette in Chrome "Chronicle Web Clipper" en in de instellingen en de popup nog "Obsidian Web Clipper". Die naam is nu overal **Zett Web Clipper**: `manifest.chrome.json`, `manifest.firefox.json`, `manifest.safari.json`, de `<title>` van `popup.html`, `settings.html`, `side-panel.html` en `reader.html` ("Zett Reader"), de `extensionName` in alle `_locales`, en de titel in de navigatiebalk van `settings.html`. Het Obsidian-logo in de zijbalk en de navigatiebalk is vervangen door het Zett-merkteken (`src/icons/zett-mark.png`), net als de extensie-iconen (16/48/128). De twee bestemmingen blijven Chronicle en Zett; de teksten over Obsidian-vaults in de instellingen zijn van de fork overgenomen en niet aangeraakt.
+
+## Beelden lokaal bewaren (2026-11-25)
+
+Een clip met `![x](https://…/beeld.png)` was een verwijzing: verdween de pagina of het CDN, dan was
+het beeld weg. Bij bestemming **Zett** haalt de extensie de beelden nu op en laat ze daar bewaren,
+inhoud-geadresseerd op sha256 — dezelfde afspraak als in `docs/media-archivering.md` van de
+Zett-repo. Bij bestemming Chronicle verandert er niets (die app regelt het zelf).
+
+- **`src/utils/media-archive.ts`** (nieuw): `collectImageUrls` leest de `<img>`- en
+  `<picture><source>`-kandidaten uit de HTML (uit een `srcset` de grootste), `archiveImages` haalt
+  ze op en zet ze bij Zett neer, `sha256Hex` rekent de hash, `rewriteMarkdown` vervangt in de
+  Markdown de bron van een afbeelding door `zett-media://<hash>`.
+- **Regels**, dezelfde als `utils/imageFetch.ts` van de app: alleen https, geen `localhost` of
+  privébereiken, 25 MB per beeld, maximaal 30 per clip, en het type komt uit de eerste bytes.
+  Bewust **zonder cookies**: een beeld dat de sessie van de browser vraagt wordt overgeslagen en
+  als gat met reden gemeld (`HTTP 403`) — er wordt geen toegangscontrole omzeild.
+- **`src/utils/zett-note-creator.ts`**: `saveToZett(…, pageHtml?)` bewaart eerst de beelden en
+  stuurt dan de clip, met `media` (hashes) en `media_gaps` (wat niet lukte) in de payload. De
+  Markdown verwijst naar de hash; de oorspronkelijke URL blijft alleen aan de Zett-kant bewaard
+  (`media.origin_url`), zodat het openen van de notitie de bronsite niet meer pingt.
+- **`src/utils/clip-destination.ts`**: `saveClip(…, pageHtml?)` geeft door en geeft het aantal
+  bewaarde en mislukte beelden terug. Zonder HTML is de aanroep naar `saveToZett` ongewijzigd.
+- **Instelling** "Bewaar de afbeeldingen van de pagina in Zett" in de Zett-sectie, standaard aan
+  (`archiveImages` in `types.ts`, `storage-utils.ts`, `cli-stubs.ts`, `settings.html` en
+  `general-settings.ts`). De popup toont onder de knop *"12 afbeeldingen bewaard, 2 niet
+  opgehaald"*; met die regel eronder blijft de popup 2,5 s staan in plaats van 0,5 s.
+- **`src/_locales/en|nl/messages.json`**: twee sleutels erbij (`archiveImages`,
+  `archiveImagesDescription`); de andere locales vallen terug op Engels, zoals `getMessage` al doet.
+- **CLI**: `archiveImages: false` — de CLI knipt zonder browser, er valt geen beeld op te halen.
+- **Tests**: `src/utils/media-archive.test.ts` (sniffen, srcset-keuze, adrescontrole, dedupe,
+  403/leeg/te groot, de hash, het herschrijven en de samenvatting).

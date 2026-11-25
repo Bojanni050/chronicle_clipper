@@ -13,11 +13,13 @@ import { exportHighlights, importHighlights } from './highlights-manager';
 import { getMessage, setupLanguageAndDirection } from '../utils/i18n';
 import { debounce } from '../utils/debounce';
 import browser from '../utils/browser-polyfill';
-import { createUsageChart, aggregateUsageData } from '../utils/charts';
+import { createUsageChart, aggregateUsageData, UsageMetric } from '../utils/charts';
 import { getClipHistory } from '../utils/storage-utils';
 import dayjs from 'dayjs';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
 import { showModal, hideModal } from '../utils/modal-utils';
+import { clearChronicleConnection, resolveChronicleConnection } from '../utils/chronicle-connection';
+import { clearZettConnection, resolveZettConnection } from '../utils/zett-note-creator';
 
 dayjs.extend(weekOfYear);
 
@@ -177,7 +179,7 @@ export function initializeGeneralSettings(): void {
 
 		// Get clip history and ratings
 		const history = await getClipHistory();
-		const totalClips = history.length;
+		const totalClips = history.filter(entry => entry.action !== 'readerMode').length;
 		const existingRatings = await getLocalStorage('ratings') || [];
 
 		// Show rating section only total clips >= 20 and no previous ratings
@@ -212,10 +214,13 @@ export function initializeGeneralSettings(): void {
 		}
 
 		updateVaultList();
+		initializeChronicleSettings();
+		initializeZettSettings();
 		initializeShowMoreActionsToggle();
 		initializeBetaFeaturesToggle();
 		initializeLegacyModeToggle();
 		initializeSilentOpenToggle();
+		initializeArchiveImagesToggle();
 		initializeVaultInput();
 		initializeOpenBehaviorDropdown();
 		initializeKeyboardShortcuts();
@@ -247,23 +252,93 @@ function initializeAutoSave(): void {
 	}
 }
 
+/** Vult de Chronicle-URL en controleert de verbinding met de lokale app. */
+function initializeChronicleSettings(): void {
+	const urlInput = document.getElementById('chronicle-url-input') as HTMLInputElement;
+	const status = document.getElementById('chronicle-status');
+	const testButton = document.getElementById('chronicle-test-btn') as HTMLButtonElement | null;
+	if (urlInput) urlInput.value = generalSettings.chronicleUrl;
+	if (!testButton) return;
+
+	const check = async (force: boolean) => {
+		if (status) status.textContent = 'Verbinden…';
+		testButton.disabled = true;
+		try {
+			if (force) clearChronicleConnection();
+			const connection = await resolveChronicleConnection({ force });
+			if (status) status.textContent = `Verbonden met ${connection.baseUrl}. Clips worden daar afgeleverd.`;
+			if (urlInput) urlInput.value = connection.baseUrl;
+		} catch (error) {
+			if (status) {
+				status.textContent = error instanceof Error ? error.message : String(error);
+			}
+		} finally {
+			testButton.disabled = false;
+		}
+	};
+
+	testButton.addEventListener('click', () => { void check(true); });
+
+	// Silent probe on open: gives immediate feedback without a stored token.
+	void check(false);
+}
+
+/** Vult de bestemming en de Zett-URL, en controleert de verbinding met de lokale app. */
+function initializeZettSettings(): void {
+	const destination = document.getElementById('clip-destination-select') as HTMLSelectElement | null;
+	const urlInput = document.getElementById('zett-url-input') as HTMLInputElement | null;
+	const status = document.getElementById('zett-status');
+	const testButton = document.getElementById('zett-test-btn') as HTMLButtonElement | null;
+	if (destination) destination.value = generalSettings.clipDestination;
+	if (urlInput) urlInput.value = generalSettings.zettUrl;
+	if (!testButton) return;
+
+	const check = async (force: boolean) => {
+		if (status) status.textContent = 'Verbinden…';
+		testButton.disabled = true;
+		try {
+			if (force) clearZettConnection();
+			const connection = await resolveZettConnection({ force });
+			if (status) status.textContent = `Verbonden met ${connection.baseUrl}. Clips worden daar afgeleverd.`;
+			if (urlInput) urlInput.value = connection.baseUrl;
+		} catch (error) {
+			if (status) status.textContent = error instanceof Error ? error.message : String(error);
+		} finally {
+			testButton.disabled = false;
+		}
+	};
+
+	testButton.addEventListener('click', () => { void check(true); });
+
+	// Alleen vanzelf proberen als Zett de bestemming is: anders geen onnodige verzoeken.
+	if (generalSettings.clipDestination === 'zett') void check(false);
+}
+
 function saveSettingsFromForm(): void {
 	const openBehaviorDropdown = document.getElementById('open-behavior-dropdown') as HTMLSelectElement;
+	const chronicleUrlInput = document.getElementById('chronicle-url-input') as HTMLInputElement;
+	const clipDestinationSelect = document.getElementById('clip-destination-select') as HTMLSelectElement | null;
+	const zettUrlInput = document.getElementById('zett-url-input') as HTMLInputElement | null;
 	const showMoreActionsToggle = document.getElementById('show-more-actions-toggle') as HTMLInputElement;
 	const betaFeaturesToggle = document.getElementById('beta-features-toggle') as HTMLInputElement;
 	const legacyModeToggle = document.getElementById('legacy-mode-toggle') as HTMLInputElement;
 	const silentOpenToggle = document.getElementById('silent-open-toggle') as HTMLInputElement;
+	const archiveImagesToggle = document.getElementById('archive-images-toggle') as HTMLInputElement;
 	const highlighterToggle = document.getElementById('highlighter-toggle') as HTMLInputElement;
 	const alwaysShowHighlightsToggle = document.getElementById('highlighter-visibility') as HTMLInputElement;
 	const highlightBehaviorSelect = document.getElementById('highlighter-behavior') as HTMLSelectElement;
 
 	const updatedSettings = {
 		...generalSettings, // Keep existing settings
+		chronicleUrl: chronicleUrlInput?.value?.trim() || generalSettings.chronicleUrl,
+		clipDestination: clipDestinationSelect?.value === 'zett' ? 'zett' as const : clipDestinationSelect?.value === 'chronicle' ? 'chronicle' as const : generalSettings.clipDestination,
+		zettUrl: zettUrlInput?.value?.trim() || generalSettings.zettUrl,
 		openBehavior: (openBehaviorDropdown?.value as Settings['openBehavior']) ?? generalSettings.openBehavior,
 		showMoreActionsButton: showMoreActionsToggle?.checked ?? generalSettings.showMoreActionsButton,
 		betaFeatures: betaFeaturesToggle?.checked ?? generalSettings.betaFeatures,
 		legacyMode: legacyModeToggle?.checked ?? generalSettings.legacyMode,
 		silentOpen: silentOpenToggle?.checked ?? generalSettings.silentOpen,
+		archiveImages: archiveImagesToggle?.checked ?? generalSettings.archiveImages,
 		highlighterEnabled: highlighterToggle?.checked ?? generalSettings.highlighterEnabled,
 		alwaysShowHighlights: alwaysShowHighlightsToggle?.checked ?? generalSettings.alwaysShowHighlights,
 		highlightBehavior: highlightBehaviorSelect?.value ?? generalSettings.highlightBehavior
@@ -341,6 +416,13 @@ function initializeLegacyModeToggle(): void {
 function initializeSilentOpenToggle(): void {
 	initializeSettingToggle('silent-open-toggle', generalSettings.silentOpen, (checked) => {
 		saveSettings({ ...generalSettings, silentOpen: checked });
+	});
+}
+
+/** Beelden van de pagina door Zett laten bewaren in plaats van als hotlink te laten staan. */
+function initializeArchiveImagesToggle(): void {
+	initializeSettingToggle('archive-images-toggle', generalSettings.archiveImages, (checked) => {
+		saveSettings({ ...generalSettings, archiveImages: checked });
 	});
 }
 
@@ -436,9 +518,10 @@ function initializeHighlighterSettings(): void {
 
 async function initializeUsageChart(): Promise<void> {
 	const chartContainer = document.getElementById('usage-chart');
+	const metricSelect = document.getElementById('usage-metric-select') as HTMLSelectElement;
 	const periodSelect = document.getElementById('usage-period-select') as HTMLSelectElement;
 	const aggregationSelect = document.getElementById('usage-aggregation-select') as HTMLSelectElement;
-	if (!chartContainer || !periodSelect || !aggregationSelect) return;
+	if (!chartContainer || !metricSelect || !periodSelect || !aggregationSelect) return;
 
 	const history = await getClipHistory();
 
@@ -447,15 +530,16 @@ async function initializeUsageChart(): Promise<void> {
 			timeRange: periodSelect.value as '30d' | 'all',
 			aggregation: aggregationSelect.value as 'day' | 'week' | 'month'
 		};
-		
+
 		const chartData = aggregateUsageData(history, options);
-		await createUsageChart(chartContainer, chartData);
+		await createUsageChart(chartContainer, chartData, metricSelect.value as UsageMetric);
 	};
 
 	// Initialize with default selections
 	await updateChart();
 
 	// Update when any selector changes
+	metricSelect.addEventListener('change', updateChart);
 	periodSelect.addEventListener('change', updateChart);
 	aggregationSelect.addEventListener('change', updateChart);
 }
