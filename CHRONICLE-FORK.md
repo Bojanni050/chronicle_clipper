@@ -206,8 +206,13 @@ uit de volledige pagina-HTML die de clipper al ophaalt (`fullHtml`).
   `url`, `post-url`, `link-url` en de titel-link; de rest van de pagina staat vol links naar andere
   posts en blijft buiten beeld. `videoProviderFromUrl` levert de naam die in het label komt:
   `[Video (YouTube)](https://youtu.be/…)`. Een rauwe `.mp4`-link telt ook mee, zonder naam.
-- **`src/manifest.chrome.json`**: versie 1.7.1.8.
-- **Tests**: negen nieuwe tests in `video-links.test.ts` (permutatievolgorde en dedupe, mp4 boven
+- **Tweets** tellen als externe speler (`provider: 'X'`). Linkt de post naar een tweet, dan haalt
+  `resolveVideoLinks` de mp4's van die tweet op met dezelfde syndication-fetch en vervangt de
+  tweet-link; heeft de tweet geen video, dan blijft de tweet-link staan. Kost één verzoek, alleen
+  als er echt een tweet-link in de post staat.
+- **`src/manifest.chrome.json`**: versie 1.7.1.9.
+- **Tests**: elf nieuwe tests in `video-links.test.ts` (permutatievolgorde en dedupe, mp4 boven
   HLS, HLS/MPD-terugval zonder 96p, pagina zonder speler, manifesten weg zodra er een mp4 is,
   YouTube-linkpost, titel-link als terugval, linkpost naar een gewone pagina, spelernaam in het
-  label); 31 tests groen, `npm run build:chrome` ok.
+  label, tweet-video uit een linkpost, tweet zonder video); 33 tests groen,
+  `npm run build:chrome` ok.

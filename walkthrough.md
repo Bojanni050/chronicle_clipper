@@ -1,5 +1,11 @@
 # Walkthrough
 
+## 2026-11-26 (Tweet-video's achter een Reddit-linkpost)
+
+- Findings: Een Reddit-linkpost naar een tweet gaf alleen de tweet-URL, niet de video. De syndication-fetch bestond al, maar draaide alleen als de geclipte pagina zélf een tweet was.
+- Conclusions: De tweet-link binnen de Reddit-scan herkennen (`provider: 'X'`) en in `resolveVideoLinks` uitbreiden naar de mp4's; lukt dat, dan verdwijnt de kale tweet-link, anders blijft hij staan. Zo blijft één link per video en kost het alleen een verzoek als er echt een tweet in de post staat.
+- Actions: `VIDEO_PROVIDERS` kreeg x.com/twitter.com, `resolveVideoLinks` expandeert X-links via `resolveTweetVideos` en vervangt ze in de lijst; twee tests erbij in `src/utils/video-links.test.ts`; manifest naar 1.7.1.9; `CHRONICLE-FORK.md` aangevuld. 33 tests groen, `npm run build:chrome` ok; validated.
+
 ## 2026-11-26 (Ook externe video's van Reddit)
 
 - Findings: De Reddit-fix dekte alleen native video's (`v.redd.it`). Een linkpost naar YouTube of Streamable zet de video niet op de pagina; het enige spoor is de post-link (`content-href` op `<shreddit-post>` en de titel-link), die niet in de geëxtraheerde inhoud belandt.

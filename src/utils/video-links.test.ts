@@ -237,6 +237,39 @@ describe('Reddit', () => {
 			.toBe('[Video (YouTube)](https://youtu.be/abc)');
 	});
 
+	test('haalt de video op van een tweet waarnaar de post linkt', async () => {
+		const fetchImpl = vi.fn(async () => syndicationResponse(bitmapTweet)) as unknown as typeof fetch;
+		const links = await resolveVideoLinks({
+			pageUrl: 'https://www.reddit.com/r/x/comments/1y59rf5/x/',
+			fullHtml: '<shreddit-post content-href="https://twitter.com/bitmapstudio/status/2124906133660094712"><a slot="full-post-link" href="https://twitter.com/bitmapstudio/status/2124906133660094712">filmpje</a></shreddit-post>',
+			fetchImpl,
+		});
+
+		expect(links).toEqual([
+			{
+				url: mp4Large,
+				poster: 'https://pbs.twimg.com/poster.jpg',
+				durationMs: 4200,
+				bitrate: 2176000,
+				provider: 'X',
+				source: 'tweet',
+			},
+		]);
+		expect(fetchImpl).toHaveBeenCalledTimes(1);
+	});
+
+	test('laat de tweet-link staan als de tweet geen video heeft', async () => {
+		const fetchImpl = vi.fn(async () => syndicationResponse({}, 404)) as unknown as typeof fetch;
+		const url = 'https://x.com/bitmapstudio/status/2124906133660094712';
+		const links = await resolveVideoLinks({
+			pageUrl: 'https://www.reddit.com/r/x/comments/1y59rf5/x/',
+			fullHtml: `<shreddit-post content-href="${url}"></shreddit-post>`,
+			fetchImpl,
+		});
+
+		expect(links).toEqual([{ url, provider: 'X', source: 'page' }]);
+	});
+
 	test('doet niets op een pagina zonder Reddit-speler', () => {
 		expect(collectRedditVideoLinks('<p>gewoon een artikel</p>', 'https://example.com/artikel')).toEqual([]);
 		expect(collectRedditVideoLinks('', 'https://www.reddit.com/r/x/comments/abc/')).toEqual([]);

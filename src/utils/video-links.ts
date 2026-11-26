@@ -66,6 +66,7 @@ const REDDIT_POST = /<shreddit-post[\s>]/i;
  */
 const VIDEO_PROVIDERS: Array<{ host: RegExp; name: string }> = [
 	{ host: /(^|\.)(youtube\.com|youtube-nocookie\.com|youtu\.be)$/, name: 'YouTube' },
+	{ host: /(^|\.)(x\.com|twitter\.com)$/, name: 'X' },
 	{ host: /(^|\.)vimeo\.com$/, name: 'Vimeo' },
 	{ host: /(^|\.)streamable\.com$/, name: 'Streamable' },
 	{ host: /(^|\.)twitch\.tv$/, name: 'Twitch' },
@@ -392,7 +393,11 @@ export function collectRedditVideoLinks(html: string, pageUrl: string): VideoLin
 	return dedupe([...links, ...externalVideoLinksFromDoc(doc, pageUrl)]);
 }
 
-/** Alle videolinks die bij deze pagina horen: eerst de tweet zelf, dan wat de inhoud aanwijst. */
+/**
+ * Alle videolinks die bij deze pagina horen: eerst de tweet zelf, dan wat de inhoud aanwijst.
+ * Linkt een Reddit-post naar een tweet, dan halen we de mp4's van die tweet op en vervangen we de
+ * tweet-link; zonder video blijft de tweet-link staan.
+ */
 export async function resolveVideoLinks(context: VideoLinkContext): Promise<VideoLink[]> {
 	const links: VideoLink[] = [];
 
@@ -406,7 +411,30 @@ export async function resolveVideoLinks(context: VideoLinkContext): Promise<Vide
 
 	// Reddit: de mp4's staan in een attribuut op de speler in de volledige pagina-HTML. De
 	// geëxtraheerde inhoud (`contentHtml`) bevat dat attribuut niet.
-	links.push(...collectRedditVideoLinks(context.fullHtml || context.contentHtml || '', context.pageUrl));
+	const redditLinks = collectRedditVideoLinks(context.fullHtml || context.contentHtml || '', context.pageUrl);
+	links.push(...redditLinks);
+
+	if (redditLinks.some(link => link.provider === 'X')) {
+		const resolved = new Map<string, VideoLink[]>();
+		for (const link of redditLinks) {
+			if (link.provider !== 'X') continue;
+			try {
+				const videos = await resolveTweetVideos(link.url, context.fetchImpl, context.timeoutMs);
+				if (videos.length > 0) {
+					resolved.set(link.url, videos.map(video => ({ ...video, provider: 'X' })));
+				}
+			} catch (error) {
+				debugLog('Video links', 'Tweet uit een Reddit-post mislukt:', error instanceof Error ? error.message : error);
+			}
+		}
+
+		if (resolved.size > 0) {
+			links.splice(0, links.length, ...links.flatMap(link => {
+				const videos = link.provider === 'X' ? resolved.get(link.url) : undefined;
+				return videos || [link];
+			}));
+		}
+	}
 
 	if (context.contentHtml) {
 		links.push(...collectPageVideoLinks(context.contentHtml, context.pageUrl, context.metaTags));
