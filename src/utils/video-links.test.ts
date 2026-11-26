@@ -11,6 +11,7 @@ import {
 	resolveVideoLinks,
 	tweetIdFromUrl,
 	videoLinkMarkdown,
+	videoProviderFromUrl,
 	videosFromSyndication,
 } from './video-links';
 
@@ -210,6 +211,30 @@ describe('Reddit', () => {
 			'https://v.redd.it/xyz/HLSPlaylist.m3u8',
 			'https://v.redd.it/xyz/DASHPlaylist.mpd',
 		]);
+	});
+
+	test('haalt de uitgaande videolink van een linkpost', () => {
+		const html = `<shreddit-post content-href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" post-title="filmpje"><a slot="full-post-link" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">filmpje</a></shreddit-post>`;
+		expect(collectRedditVideoLinks(html, 'https://www.reddit.com/r/x/comments/1y59rf5/x/')).toEqual([
+			{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', provider: 'YouTube', source: 'page' },
+		]);
+	});
+
+	test('valt terug op de titel-link als content-href ontbreekt', () => {
+		const html = '<shreddit-post><a slot="full-post-link" href="https://youtu.be/abc123">filmpje</a></shreddit-post>';
+		const links = collectRedditVideoLinks(html, 'https://www.reddit.com/r/x/comments/1y59rf5/x/');
+		expect(links.map(link => link.url)).toEqual(['https://youtu.be/abc123']);
+		expect(videoProviderFromUrl('https://vimeo.com/12345')).toBe('Vimeo');
+	});
+
+	test('negeert een linkpost naar een gewone pagina', () => {
+		const html = `<shreddit-post content-href="https://example.com/artikel"><a slot="full-post-link" href="https://example.com/artikel">artikel</a></shreddit-post>`;
+		expect(collectRedditVideoLinks(html, 'https://www.reddit.com/r/x/comments/1y59rf5/x/')).toEqual([]);
+	});
+
+	test('zet de spelernaam in het label', () => {
+		expect(videoLinkMarkdown({ url: 'https://youtu.be/abc', provider: 'YouTube', source: 'page' }))
+			.toBe('[Video (YouTube)](https://youtu.be/abc)');
 	});
 
 	test('doet niets op een pagina zonder Reddit-speler', () => {

@@ -1,5 +1,11 @@
 # Walkthrough
 
+## 2026-11-26 (Ook externe video's van Reddit)
+
+- Findings: De Reddit-fix dekte alleen native video's (`v.redd.it`). Een linkpost naar YouTube of Streamable zet de video niet op de pagina; het enige spoor is de post-link (`content-href` op `<shreddit-post>` en de titel-link), die niet in de geëxtraheerde inhoud belandt.
+- Conclusions: Binnen `<shreddit-post>` kijken naar de linkattributen en de titel-link, en alleen doorgaan bij een bekende spelershost of een rauwe `.mp4`. De rest van de pagina laten we liggen: daar staan tientallen links naar andere posts. De spelernaam in het label (`[Video (YouTube)](…)`) is nuttiger dan een kale URL, want je ziet meteen waar je heen gaat.
+- Actions: `src/utils/video-links.ts` kreeg `videoProviderFromUrl`, `VIDEO_PROVIDERS`, `REDDIT_POST`, `redditExternalVideoLinks` + `externalVideoLinksFromDoc`, `provider` op `VideoLink` en de spelernaam in `videoLinkMarkdown`; `collectRedditVideoLinks` draait de externe scan ook zonder `v.redd.it`-signaal; vier tests erbij in `src/utils/video-links.test.ts`; `src/manifest.chrome.json` naar 1.7.1.8; `CHRONICLE-FORK.md` aangevuld. `npx vitest run src/utils/video-links.test.ts` (31 groen) en `npm run build:chrome` gedraaid; validated.
+
 ## 2026-11-26 (Video's van Reddit)
 
 - Findings: Een geclipte Reddit-post met video (`r/vibecoding/comments/1y59rf5`) gaf alleen de tekst. Reddit speelt via MediaSource (het `<video>` krijgt een `blob:`-adres) en bewaart de mp4's in `playbackMp4s.permutations` van het `packaged-media-json`-attribuut op `<shreddit-player>`. Dat attribuut zit niet in de geëxtraheerde inhoud en de postpagina heeft geen `og:video`, dus de bestaande detectie (`contentHtml`, meta-tags) zag niets.

@@ -22,6 +22,8 @@ export interface VideoLink {
 	poster?: string;
 	durationMs?: number;
 	bitrate?: number;
+	/** Naam van de externe speler (YouTube, Vimeo, …) als de video daar staat en niet hier. */
+	provider?: string;
 	source: 'tweet' | 'page';
 }
 
@@ -54,6 +56,24 @@ const DEFAULT_TIMEOUT_MS = 5000;
 
 /** Zegt of deze HTML een Reddit-speler kan bevatten; scheelt een DOMParser over elke pagina. */
 const REDDIT_SIGNAL = /packaged-media-json|v\.redd\.it/i;
+
+/** Zegt of deze HTML een Reddit-post kan bevatten (voor de uitgaande videolink van een linkpost). */
+const REDDIT_POST = /<shreddit-post[\s>]/i;
+
+/**
+ * Spelers die we herkennen als de video niet op de pagina zelf staat. Alleen de host telt: een
+ * linkpost naar YouTube heeft in de HTML geen spoor van de video zelf.
+ */
+const VIDEO_PROVIDERS: Array<{ host: RegExp; name: string }> = [
+	{ host: /(^|\.)(youtube\.com|youtube-nocookie\.com|youtu\.be)$/, name: 'YouTube' },
+	{ host: /(^|\.)vimeo\.com$/, name: 'Vimeo' },
+	{ host: /(^|\.)streamable\.com$/, name: 'Streamable' },
+	{ host: /(^|\.)twitch\.tv$/, name: 'Twitch' },
+	{ host: /(^|\.)(dailymotion\.com|dai\.ly)$/, name: 'Dailymotion' },
+	{ host: /(^|\.)redgifs\.com$/, name: 'RedGifs' },
+	{ host: /(^|\.)gfycat\.com$/, name: 'Gfycat' },
+	{ host: /(^|\.)imgur\.com$/, name: 'Imgur' },
+];
 
 /**
  * Het statusnummer uit een x.com/twitter.com-adres, of `null`.
@@ -116,8 +136,21 @@ export function formatDuration(ms: number | undefined): string {
 
 export function videoLinkMarkdown(link: VideoLink, index?: number): string {
 	const duration = formatDuration(link.durationMs);
-	const label = `Video${index ? ` ${index}` : ''}${duration ? ` (${duration})` : ''}`;
+	const provider = link.provider ? ` (${link.provider})` : '';
+	const label = `Video${index ? ` ${index}` : ''}${provider}${duration ? ` (${duration})` : ''}`;
 	return `[${label}](${link.url})`;
+}
+
+/** De naam van de speler waar deze link naartoe gaat, of `null` als het geen bekende videoservice is. */
+export function videoProviderFromUrl(url: string): string | null {
+	let host: string;
+	try {
+		host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+	} catch {
+		return null;
+	}
+	const match = VIDEO_PROVIDERS.find(entry => entry.host.test(host));
+	return match ? match.name : null;
 }
 
 /** Haalt de mp4-varianten van een tweet op. Stille mislukking: geen video is geen fout. */
@@ -279,12 +312,54 @@ export function redditPackagedMp4s(raw: string | null | undefined): string[] {
 }
 
 /**
+ * De uitgaande videolink van een Reddit-linkpost: staat de video bij YouTube, Vimeo, Streamable of
+ * een andere bekende speler, dan is de link het enige spoor in de HTML. We kijken alleen binnen
+ * `<shreddit-post>`, want de rest van de pagina staat vol links naar andere posts.
+ */
+export function redditExternalVideoLinks(html: string, pageUrl: string): VideoLink[] {
+	if (!html || !REDDIT_POST.test(html)) return [];
+
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, 'text/html');
+	} catch {
+		return [];
+	}
+
+	return externalVideoLinksFromDoc(doc, pageUrl);
+}
+
+function externalVideoLinksFromDoc(doc: Document, pageUrl: string): VideoLink[] {
+	const links: VideoLink[] = [];
+	doc.querySelectorAll('shreddit-post').forEach(post => {
+		const candidates: string[] = [];
+		for (const name of ['content-href', 'url', 'post-url', 'link-url']) {
+			const value = post.getAttribute(name);
+			if (value) candidates.push(value);
+		}
+		post.querySelectorAll('a[href]').forEach(anchor => candidates.push(anchor.getAttribute('href') || ''));
+
+		for (const candidate of candidates) {
+			const absolute = absoluteHttpUrl(candidate, pageUrl);
+			if (!absolute) continue;
+
+			const provider = videoProviderFromUrl(absolute);
+			if (!provider && !isMp4Url(absolute)) continue;
+
+			links.push({ url: absolute, provider: provider || undefined, source: 'page' });
+		}
+	});
+
+	return dedupe(links);
+}
+
+/**
  * De videolinks van een Reddit-post. Eerst de mp4's uit de speler-JSON; heeft de speler die nog
  * niet, dan blijft de HLS-playlist of de DASH-manifest over. De `preview` slaan we over: dat is
  * een stille 96p-clip voor de seek-balk, geen video.
  */
 export function collectRedditVideoLinks(html: string, pageUrl: string): VideoLink[] {
-	if (!html || !REDDIT_SIGNAL.test(html)) return [];
+	if (!html || (!REDDIT_SIGNAL.test(html) && !REDDIT_POST.test(html))) return [];
 
 	let doc: Document;
 	try {
@@ -294,24 +369,27 @@ export function collectRedditVideoLinks(html: string, pageUrl: string): VideoLin
 	}
 
 	const links: VideoLink[] = [];
-	doc.querySelectorAll('[packaged-media-json]').forEach(player => {
-		// Eén link per speler: de resoluties zijn dezelfde video in verschillende maten.
-		const [url] = redditPackagedMp4s(player.getAttribute('packaged-media-json'));
-		if (!url) return;
-		const poster = absoluteHttpUrl(player.getAttribute('poster') || '', pageUrl) || undefined;
-		links.push({ url, poster, source: 'page' });
-	});
-	if (links.length > 0) return dedupe(links);
+	if (REDDIT_SIGNAL.test(html)) {
+		doc.querySelectorAll('[packaged-media-json]').forEach(player => {
+			// Eén link per speler: de resoluties zijn dezelfde video in verschillende maten.
+			const [url] = redditPackagedMp4s(player.getAttribute('packaged-media-json'));
+			if (!url) return;
+			const poster = absoluteHttpUrl(player.getAttribute('poster') || '', pageUrl) || undefined;
+			links.push({ url, poster, source: 'page' });
+		});
+	}
+	if (links.length === 0) {
+		const candidates: string[] = [];
+		doc.querySelectorAll('shreddit-player, [data-hls-url], [data-mpd-url]').forEach(player => {
+			for (const name of ['src', 'data-hls-url', 'data-mpd-url', 'preview']) {
+				const value = player.getAttribute(name);
+				if (value && !/(?:CMAF|DASH)_96\.mp4/i.test(value)) candidates.push(value);
+			}
+		});
+		addPageLinks(links, candidates, pageUrl);
+	}
 
-	const candidates: string[] = [];
-	doc.querySelectorAll('shreddit-player, [data-hls-url], [data-mpd-url]').forEach(player => {
-		for (const name of ['src', 'data-hls-url', 'data-mpd-url', 'preview']) {
-			const value = player.getAttribute(name);
-			if (value && !/(?:CMAF|DASH)_96\.mp4/i.test(value)) candidates.push(value);
-		}
-	});
-	addPageLinks(links, candidates, pageUrl);
-	return dedupe(links);
+	return dedupe([...links, ...externalVideoLinksFromDoc(doc, pageUrl)]);
 }
 
 /** Alle videolinks die bij deze pagina horen: eerst de tweet zelf, dan wat de inhoud aanwijst. */

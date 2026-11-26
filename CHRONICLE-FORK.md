@@ -198,11 +198,16 @@ uit de volledige pagina-HTML die de clipper al ophaalt (`fullHtml`).
   pagina-links. `preferRedditMp4` laat de HLS-playlist en de MPD van `v.redd.it` vallen zodra er
   een mp4 van die host is: dat is dezelfde video in een vorm die je later niet zonder speler opent.
 - **`src/utils/content-extractor.ts`** geeft `fullHtml` mee aan `appendVideoLinksFromPage`.
-- **Kosten**: de HTML wordt alleen geparsed als er `packaged-media-json` of `v.redd.it` in staat
-  (`REDDIT_SIGNAL`), dus elke andere pagina betaalt één regex.
-- **Bekend gat**: een Reddit-post die naar een externe speler linkt (YouTube, Streamable) levert
-  nog geen link op; alleen natives (`v.redd.it`) worden herkend.
-- **`src/manifest.chrome.json`**: versie 1.7.1.7.
-- **Tests**: vijf nieuwe tests in `video-links.test.ts` (permutatievolgorde en dedupe, mp4 boven
-  HLS, HLS/MPD-terugval zonder 96p, pagina zonder speler, manifesten weg zodra er een mp4 is);
-  27 tests groen, `npm run build:chrome` ok.
+- **Kosten**: de HTML wordt alleen geparsed als er `packaged-media-json`, `v.redd.it` of
+  `<shreddit-post` in staat, dus elke andere pagina betaalt één regex.
+- **Externe spelers** krijgen ook een link: bij een linkpost staat de video bij YouTube, Vimeo,
+  Streamable, Twitch, Dailymotion, RedGifs, Gfycat of Imgur en is het adres het enige spoor in de
+  HTML. `redditExternalVideoLinks` kijkt daarvoor binnen `<shreddit-post>` naar `content-href`,
+  `url`, `post-url`, `link-url` en de titel-link; de rest van de pagina staat vol links naar andere
+  posts en blijft buiten beeld. `videoProviderFromUrl` levert de naam die in het label komt:
+  `[Video (YouTube)](https://youtu.be/…)`. Een rauwe `.mp4`-link telt ook mee, zonder naam.
+- **`src/manifest.chrome.json`**: versie 1.7.1.8.
+- **Tests**: negen nieuwe tests in `video-links.test.ts` (permutatievolgorde en dedupe, mp4 boven
+  HLS, HLS/MPD-terugval zonder 96p, pagina zonder speler, manifesten weg zodra er een mp4 is,
+  YouTube-linkpost, titel-link als terugval, linkpost naar een gewone pagina, spelernaam in het
+  label); 31 tests groen, `npm run build:chrome` ok.
