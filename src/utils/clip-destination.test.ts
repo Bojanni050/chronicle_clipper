@@ -8,7 +8,7 @@ vi.mock('./zett-note-creator', () => ({ saveToZett: vi.fn(async () => {}) }));
 
 import { saveToChronicle } from './chronicle-note-creator';
 import { saveToZett } from './zett-note-creator';
-import { clipButtonLabel, clipDestination, saveClip } from './clip-destination';
+import { clipButtonLabel, clipDestination, destinationLabel, saveClip } from './clip-destination';
 
 beforeEach(() => {
 	vi.mocked(saveToChronicle).mockClear();
@@ -50,5 +50,28 @@ describe('clip destination', () => {
 		settings.clipDestination = 'zett';
 		vi.mocked(saveToZett).mockRejectedValueOnce(new Error('Zett is niet bereikbaar'));
 		await expect(saveClip('c', 'n', 'https://example.com')).rejects.toThrow('niet bereikbaar');
+	});
+
+	it('lets a single clip override the setting, so the menu can pick either receiver', async () => {
+		settings.clipDestination = 'chronicle';
+		await saveClip('c', 'n', 'https://example.com', undefined, 'zett');
+		expect(saveToZett).toHaveBeenCalledWith('c', 'n', 'https://example.com');
+		expect(saveToChronicle).not.toHaveBeenCalled();
+
+		vi.mocked(saveToChronicle).mockClear();
+		vi.mocked(saveToZett).mockClear();
+		settings.clipDestination = 'zett';
+		await saveClip('c', 'n', 'https://example.com', undefined, 'chronicle');
+		expect(saveToChronicle).toHaveBeenCalledWith('c', 'n', 'https://example.com');
+		expect(saveToZett).not.toHaveBeenCalled();
+	});
+
+	it('names both receivers in the browser language, for the menu', () => {
+		vi.stubGlobal('navigator', { language: 'nl-NL' });
+		expect(destinationLabel('chronicle')).toBe('Toevoegen aan Chronicle');
+		expect(destinationLabel('zett')).toBe('Toevoegen aan Zett');
+		vi.stubGlobal('navigator', { language: 'en-US' });
+		expect(destinationLabel('chronicle')).toBe('Add to Chronicle');
+		expect(destinationLabel('zett')).toBe('Add to Zett');
 	});
 });

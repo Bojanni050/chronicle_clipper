@@ -129,3 +129,25 @@ Zett-repo. Bij bestemming Chronicle verandert er niets (die app regelt het zelf)
 - **CLI**: `archiveImages: false` — de CLI knipt zonder browser, er valt geen beeld op te halen.
 - **Tests**: `src/utils/media-archive.test.ts` (sniffen, srcset-keuze, adrescontrole, dedupe,
   403/leeg/te groot, de hash, het herschrijven en de samenvatting).
+
+## Ontvanger per clip in het menu (2026-11-26)
+
+De bestemming stond alleen in de instellingen, dus je moest vooraf kiezen naar welke app een clip
+ging. Dat is nu een standaard in plaats van een voorwaarde: het uitklapmenu naast de hoofdknop biedt
+de **andere** ontvanger aan ("Toevoegen aan Zett" of "Toevoegen aan Chronicle") en slaat de clip
+meteen daar op. De instelling blijft bepalen wat de hoofdknop doet.
+
+- **`src/utils/clip-destination.ts`**: `saveClip(…, pageHtml?, destination?)` — de vijfde parameter
+  laat één clip afwijken van `generalSettings.clipDestination`; zonder die parameter verandert er
+  niets. Nieuw is `destinationLabel(destination)`: de menu-tekst in de taal van de browser (NL/EN),
+  dezelfde regel als `clipButtonLabel` al gebruikte.
+- **`src/core/popup.ts`**: `determineMainAction` zet het menu-item voor de andere ontvanger bovenaan
+  de secundaire acties; `handleClipObsidian(destination?)` geeft die keuze door aan `saveClip`.
+  `addSecondaryAction` kreeg een optionele `label`, zodat een ontvangernaam niet door `data-i18n`
+  wordt overschreven, en sluit het menu na een klik. De twee menu-items die naar de standaard
+  bestemming sturen gebruiken nu `clipButtonLabel(...)` als tekst — anders zei het menu "Add to
+  Chronicle" terwijl de instelling op Zett stond.
+- **`src/icons/icons.ts`**: `Notebook` toegevoegd (voor Zett); Chronicle gebruikt het bestaande
+  `archive`.
+- **`src/manifest.chrome.json`**: versie 1.7.1.5.
+- **Tests**: `clip-destination.test.ts` dekt de override in beide richtingen en de labels in NL en EN.

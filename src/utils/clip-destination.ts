@@ -15,14 +15,18 @@ export function clipDestination(): ClipDestination {
 /**
  * Slaat de clip op bij de gekozen bestemming. Bij Zett worden ook de beelden van de pagina
  * bewaard (`pageHtml`); Chronicle regelt dat via de app zelf en geeft niets terug.
+ *
+ * `destination` laat de popup per clip afwijken van de instelling: het menu naast de
+ * hoofdknop kiest de ontvanger, zonder de instelling te wijzigen.
  */
 export async function saveClip(
 	fileContent: string,
 	noteName: string,
 	url: string,
 	pageHtml?: string,
+	destination: ClipDestination = clipDestination(),
 ): Promise<ZettClipResult | null> {
-	if (clipDestination() === 'zett') {
+	if (destination === 'zett') {
 		// Zonder HTML blijft de aanroep zoals hij was: er valt dan niets te bewaren.
 		return pageHtml ? saveToZett(fileContent, noteName, url, pageHtml) : saveToZett(fileContent, noteName, url);
 	}
@@ -33,6 +37,12 @@ export async function saveClip(
 /** Tekst van de hoofdknop. Bij Chronicle blijft het de bestaande, vertaalde tekst (`fallback`). */
 export function clipButtonLabel(fallback: string): string {
 	if (clipDestination() !== 'zett') return fallback;
+	return destinationLabel('zett');
+}
+
+/** Naam van een ontvanger in de taal van de browser, voor menu-items. */
+export function destinationLabel(destination: ClipDestination): string {
 	const dutch = typeof navigator !== 'undefined' && (navigator.language || '').toLowerCase().startsWith('nl');
-	return dutch ? 'Toevoegen aan Zett' : 'Add to Zett';
+	if (destination === 'zett') return dutch ? 'Toevoegen aan Zett' : 'Add to Zett';
+	return dutch ? 'Toevoegen aan Chronicle' : 'Add to Chronicle';
 }

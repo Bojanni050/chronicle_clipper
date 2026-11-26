@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { Template, Property, PromptVariable } from '../types/types';
 import { incrementStat, addHistoryEntry, getClipHistory } from '../utils/storage-utils';
 import { generateFrontmatter, saveToObsidian } from '../utils/obsidian-note-creator';
-import { saveClip, clipButtonLabel } from '../utils/clip-destination';
+import { saveClip, clipButtonLabel, clipDestination, destinationLabel, type ClipDestination } from '../utils/clip-destination';
 import { extractPageContent, initializePageContent } from '../utils/content-extractor';
 import { compileTemplate } from '../utils/template-compiler';
 import { initializeIcons, getPropertyTypeIcon } from '../icons/icons';
@@ -1314,20 +1314,30 @@ function determineMainAction() {
 	// Clear existing secondary actions
 	secondaryActions.textContent = '';
 
+	// Ontvanger per clip: het menu biedt de ándere bestemming dan de ingestelde. Zo blijft de
+	// instelling een standaard en hoef je vooraf niets te kiezen.
+	const otherDestination: ClipDestination = clipDestination() === 'zett' ? 'chronicle' : 'zett';
+	addSecondaryAction(
+		secondaryActions,
+		otherDestination,
+		() => handleClipObsidian(otherDestination),
+		destinationLabel(otherDestination),
+	);
+
 	// Set up actions based on saved behavior
 	switch (loadedSettings.saveBehavior) {
 		case 'copyToClipboard':
 			mainButton.textContent = getMessage('copyToClipboard');
 			mainButton.onclick = () => copyContent();
 			// Add direct actions to secondary
-			addSecondaryAction(secondaryActions, 'addToObsidian', () => handleClipObsidian());
+			addSecondaryAction(secondaryActions, 'addToObsidian', () => handleClipObsidian(), clipButtonLabel(getMessage('addToObsidian')));
 			addSecondaryAction(secondaryActions, 'saveFile', handleSaveToDownloads);
 			break;
 		case 'saveFile':
 			mainButton.textContent = getMessage('saveFile');
 			mainButton.onclick = () => handleSaveToDownloads();
 			// Add direct actions to secondary
-			addSecondaryAction(secondaryActions, 'addToObsidian', () => handleClipObsidian());
+			addSecondaryAction(secondaryActions, 'addToObsidian', () => handleClipObsidian(), clipButtonLabel(getMessage('addToObsidian')));
 			addSecondaryAction(secondaryActions, 'copyToClipboard', copyContent);
 			break;
 		default: // 'addToObsidian'
@@ -1339,7 +1349,7 @@ function determineMainAction() {
 	}
 }
 
-async function handleClipObsidian(): Promise<void> {
+async function handleClipObsidian(destination?: ClipDestination): Promise<void> {
 	if (!currentTemplate) return;
 	clearClipError();
 
@@ -1386,7 +1396,7 @@ async function handleClipObsidian(): Promise<void> {
 		const pageHtml = currentTabId !== undefined
 			? (await memoizedExtractPageContent(currentTabId).catch(() => null))?.fullHtml
 			: undefined;
-		const clipResult = await saveClip(fileContent, noteName, tabInfo.url, pageHtml);
+		const clipResult = await saveClip(fileContent, noteName, tabInfo.url, pageHtml, destination);
 		const hasMediaLine = !!clipResult && clipResult.archived + clipResult.failed > 0;
 		if (clipResult && hasMediaLine) {
 			showClipError(mediaSummary(clipResult.archived, clipResult.failed));
@@ -1407,7 +1417,7 @@ async function handleClipObsidian(): Promise<void> {
 	}
 }
 
-function addSecondaryAction(container: Element, actionType: string, handler: () => void) {
+function addSecondaryAction(container: Element, actionType: string, handler: () => void, label?: string) {
 	const menuItem = document.createElement('div');
 	menuItem.className = 'menu-item';
 	
@@ -1422,14 +1432,23 @@ function addSecondaryAction(container: Element, actionType: string, handler: () 
 	// Create menu item title
 	const menuItemTitle = document.createElement('div');
 	menuItemTitle.className = 'menu-item-title';
-	menuItemTitle.setAttribute('data-i18n', actionType);
-	menuItemTitle.textContent = getMessage(actionType);
+	// Een eigen label (de ontvanger) staat al in de juiste taal; alleen vaste acties
+	// worden via data-i18n door de vertaling ingevuld.
+	if (label) {
+		menuItemTitle.textContent = label;
+	} else {
+		menuItemTitle.setAttribute('data-i18n', actionType);
+		menuItemTitle.textContent = getMessage(actionType);
+	}
 	
 	// Assemble menu item
 	menuItem.appendChild(menuItemIcon);
 	menuItem.appendChild(menuItemTitle);
 	
-	menuItem.addEventListener('click', handler);
+	menuItem.addEventListener('click', () => {
+		document.getElementById('more-dropdown')?.classList.remove('show');
+		handler();
+	});
 	container.appendChild(menuItem);
 	initializeIcons(menuItem);
 }
@@ -1438,6 +1457,8 @@ function getActionIcon(actionType: string): string {
 	switch (actionType) {
 		case 'copyToClipboard': return 'copy';
 		case 'saveFile': return 'file-down';
+		case 'chronicle': return 'archive';
+		case 'zett': return 'notebook';
 		case 'addToObsidian': return 'pen-line';
 		default: return 'plus';
 	}
