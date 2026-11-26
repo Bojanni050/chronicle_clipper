@@ -179,3 +179,30 @@ terug te vinden.
 - **`src/manifest.chrome.json`**: versie 1.7.1.6.
 - **Tests**: `src/utils/video-links.test.ts` (adresherkenning, variantkeuze, duur, beide
   API-vormen, pagina- en metavideo's, dedupe, idempotent toevoegen, genummerde video's).
+
+## Reddit-video's in dezelfde module (2026-11-26)
+
+Een Reddit-post met video gaf hetzelfde gat: de tekst kwam mee, de video niet. Reddit speelt zijn
+video's via MediaSource — het `<video>`-element krijgt een `blob:`-adres — en de echte mp4's staan
+in het `packaged-media-json`-attribuut van `<shreddit-player>`. Dat attribuut zit niet in de
+geëxtraheerde inhoud, en de postpagina heeft geen bruikbare `og:video`. De mp4's zijn wel te lezen
+uit de volledige pagina-HTML die de clipper al ophaalt (`fullHtml`).
+
+- **`collectRedditVideoLinks`** (zelfde bestand) leest `playbackMp4s.permutations` uit elke speler
+  (`source.url`, hoogste `dimensions` eerst) en geeft één mp4 per speler. Zonder die JSON blijft de
+  HLS-playlist (`shreddit-player[src]`, `[data-hls-url]`) of de DASH-manifest (`[data-mpd-url]`)
+  over; de `preview` wordt overgeslagen, want dat is een stille 96p-clip voor de seek-balk.
+  `redditPackagedMp4s` doet alleen het JSON-deel (en decodeert `&quot;` als de parser dat niet al
+  deed).
+- **`resolveVideoLinks`** krijgt er `fullHtml` bij en zet de Reddit-links vóór de generieke
+  pagina-links. `preferRedditMp4` laat de HLS-playlist en de MPD van `v.redd.it` vallen zodra er
+  een mp4 van die host is: dat is dezelfde video in een vorm die je later niet zonder speler opent.
+- **`src/utils/content-extractor.ts`** geeft `fullHtml` mee aan `appendVideoLinksFromPage`.
+- **Kosten**: de HTML wordt alleen geparsed als er `packaged-media-json` of `v.redd.it` in staat
+  (`REDDIT_SIGNAL`), dus elke andere pagina betaalt één regex.
+- **Bekend gat**: een Reddit-post die naar een externe speler linkt (YouTube, Streamable) levert
+  nog geen link op; alleen natives (`v.redd.it`) worden herkend.
+- **`src/manifest.chrome.json`**: versie 1.7.1.7.
+- **Tests**: vijf nieuwe tests in `video-links.test.ts` (permutatievolgorde en dedupe, mp4 boven
+  HLS, HLS/MPD-terugval zonder 96p, pagina zonder speler, manifesten weg zodra er een mp4 is);
+  27 tests groen, `npm run build:chrome` ok.

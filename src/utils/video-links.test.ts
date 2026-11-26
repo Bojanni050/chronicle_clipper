@@ -3,8 +3,10 @@ import { describe, test, expect, vi } from 'vitest';
 import {
 	appendVideoLinks,
 	collectPageVideoLinks,
+	collectRedditVideoLinks,
 	formatDuration,
 	pickBestMp4,
+	redditPackagedMp4s,
 	resolveTweetVideos,
 	resolveVideoLinks,
 	tweetIdFromUrl,
@@ -164,6 +166,65 @@ describe('collectPageVideoLinks', () => {
 			'https://example.com/video.mp4',
 			'https://example.com/stream.mp4',
 		]);
+	});
+});
+
+describe('Reddit', () => {
+	const packaged = JSON.stringify({
+		playbackMp4s: {
+			permutations: [
+				{ source: { url: 'https://v.redd.it/abc123/CMAF_480.mp4?source=fallback', dimensions: { width: 480, height: 270 } } },
+				{ source: { url: 'https://v.redd.it/abc123/CMAF_1080.mp4?source=fallback', dimensions: { width: 1080, height: 608 } } },
+				{ source: { url: 'https://v.redd.it/abc123/CMAF_1080.mp4?source=fallback', dimensions: { width: 1080, height: 608 } } },
+			],
+		},
+	});
+	const escaped = packaged.replace(/"/g, '&quot;');
+
+	test('leest de mp4-permutaties op resolutie, zonder dubbelen', () => {
+		expect(redditPackagedMp4s(packaged)).toEqual([
+			'https://v.redd.it/abc123/CMAF_1080.mp4?source=fallback',
+			'https://v.redd.it/abc123/CMAF_480.mp4?source=fallback',
+		]);
+		expect(redditPackagedMp4s(escaped)).toHaveLength(2);
+		expect(redditPackagedMp4s('geen json')).toEqual([]);
+		expect(redditPackagedMp4s(null)).toEqual([]);
+	});
+
+	test('haalt de mp4 uit packaged-media-json en laat de HLS-playlist liggen', () => {
+		const html = `<shreddit-player poster="https://preview.redd.it/p.jpg?width=640" src="https://v.redd.it/abc123/HLSPlaylist.m3u8?source=fallback" packaged-media-json="${escaped}"></shreddit-player>`;
+		const links = collectRedditVideoLinks(html, 'https://www.reddit.com/r/vibecoding/comments/1y59rf5/x/');
+
+		expect(links.map(link => link.url)).toEqual(['https://v.redd.it/abc123/CMAF_1080.mp4?source=fallback']);
+		expect(links[0].poster).toBe('https://preview.redd.it/p.jpg?width=640');
+	});
+
+	test('valt terug op de HLS-playlist en slaat de 96p-preview over', () => {
+		const html = `
+			<shreddit-player src="https://v.redd.it/abc123/HLSPlaylist.m3u8?source=fallback" preview="https://v.redd.it/abc123/CMAF_96.mp4?source=preview"></shreddit-player>
+			<div class="reddit-video-player-root" data-hls-url="//v.redd.it/xyz/HLSPlaylist.m3u8" data-mpd-url="https://v.redd.it/xyz/DASHPlaylist.mpd"></div>
+		`;
+		const links = collectRedditVideoLinks(html, 'https://www.reddit.com/r/vibecoding/comments/1y59rf5/x/');
+		expect(links.map(link => link.url)).toEqual([
+			'https://v.redd.it/abc123/HLSPlaylist.m3u8?source=fallback',
+			'https://v.redd.it/xyz/HLSPlaylist.m3u8',
+			'https://v.redd.it/xyz/DASHPlaylist.mpd',
+		]);
+	});
+
+	test('doet niets op een pagina zonder Reddit-speler', () => {
+		expect(collectRedditVideoLinks('<p>gewoon een artikel</p>', 'https://example.com/artikel')).toEqual([]);
+		expect(collectRedditVideoLinks('', 'https://www.reddit.com/r/x/comments/abc/')).toEqual([]);
+	});
+
+	test('laat de manifesten vallen zodra er een mp4 is', async () => {
+		const fullHtml = `<shreddit-player src="https://v.redd.it/abc123/HLSPlaylist.m3u8?source=fallback" packaged-media-json="${escaped}"></shreddit-player>`;
+		const links = await resolveVideoLinks({
+			pageUrl: 'https://www.reddit.com/r/vibecoding/comments/1y59rf5/x/',
+			fullHtml,
+			contentHtml: '<video src="https://v.redd.it/abc123/HLSPlaylist.m3u8?source=fallback"></video>',
+		});
+		expect(links.map(link => link.url)).toEqual(['https://v.redd.it/abc123/CMAF_1080.mp4?source=fallback']);
 	});
 });
 

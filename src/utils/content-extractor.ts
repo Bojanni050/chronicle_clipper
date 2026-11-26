@@ -168,6 +168,7 @@ export async function initializePageContent(
 			bodyWithVideo = await appendVideoLinksFromPage(markdownBody, {
 				pageUrl: currentUrl,
 				contentHtml: content,
+				fullHtml,
 				metaTags,
 			});
 		}

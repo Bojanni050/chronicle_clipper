@@ -6,6 +6,10 @@
  * tweet met video komt zonder enige verwijzing in de notitie terecht. Deze module haalt de
  * mp4-varianten op via de publieke syndication-API en zet ze als gewone Markdown-link onder de clip.
  *
+ * Reddit doet hetzelfde met de zijne: `shreddit-player` speelt via MediaSource en de mp4's staan
+ * in het `packaged-media-json`-attribuut van die speler, dat de content-extractie niet leest. Die
+ * attributen halen we uit de volledige pagina-HTML (`fullHtml`), niet uit de geëxtraheerde inhoud.
+ *
  * Alleen linken, niet bewaren: video's zijn groot en Zett's `/ingest/media` accepteert nu alleen
  * beelden (zie `docs/media-archivering.md` in de repo van Zett). De link is wat je nodig hebt om de
  * video terug te vinden; de bytes archiveren is een aparte stap.
@@ -38,6 +42,8 @@ export interface VideoMetaTag {
 export interface VideoLinkContext {
 	pageUrl: string;
 	contentHtml?: string;
+	/** De volledige pagina-HTML; Reddit bewaart zijn mp4's in een attribuut daarin. */
+	fullHtml?: string;
 	metaTags?: VideoMetaTag[];
 	fetchImpl?: typeof fetch;
 	timeoutMs?: number;
@@ -45,6 +51,9 @@ export interface VideoLinkContext {
 
 const SYNDICATION_ENDPOINT = 'https://cdn.syndication.twimg.com/tweet-result';
 const DEFAULT_TIMEOUT_MS = 5000;
+
+/** Zegt of deze HTML een Reddit-speler kan bevatten; scheelt een DOMParser over elke pagina. */
+const REDDIT_SIGNAL = /packaged-media-json|v\.redd\.it/i;
 
 /**
  * Het statusnummer uit een x.com/twitter.com-adres, of `null`.
@@ -223,6 +232,88 @@ export function collectPageVideoLinks(
 	return dedupe(links);
 }
 
+/**
+ * De mp4-adressen uit het `packaged-media-json` van een Reddit-speler, hoogste resolutie eerst.
+ * Vorm: `{ "playbackMp4s": { "permutations": [{ "source": { "url": ..., "dimensions": {...} } }] } }`.
+ * In HTML staan de aanhalingstekens als `&quot;`; DOMParser decodeert die meestal al, vandaar de
+ * tweede poging.
+ */
+export function redditPackagedMp4s(raw: string | null | undefined): string[] {
+	if (!raw) return [];
+
+	let payload: any;
+	try {
+		payload = JSON.parse(raw);
+	} catch {
+		try {
+			payload = JSON.parse(raw.replace(/&quot;/g, '"'));
+		} catch {
+			return [];
+		}
+	}
+
+	const permutations: any[] = Array.isArray(payload?.playbackMp4s?.permutations)
+		? payload.playbackMp4s.permutations
+		: Array.isArray(payload?.playbackMp4s)
+			? payload.playbackMp4s
+			: [];
+
+	const ranked = permutations
+		.map(entry => {
+			const url = entry?.source?.url || entry?.url || entry?.src;
+			const dimensions = entry?.source?.dimensions || {};
+			const area = (Number(dimensions.width) || 0) * (Number(dimensions.height) || 0);
+			return { url: typeof url === 'string' ? url : '', area };
+		})
+		.filter(entry => /^https?:\/\//i.test(entry.url))
+		.sort((a, b) => b.area - a.area);
+
+	const seen = new Set<string>();
+	const urls: string[] = [];
+	for (const entry of ranked) {
+		if (seen.has(entry.url)) continue;
+		seen.add(entry.url);
+		urls.push(entry.url);
+	}
+	return urls;
+}
+
+/**
+ * De videolinks van een Reddit-post. Eerst de mp4's uit de speler-JSON; heeft de speler die nog
+ * niet, dan blijft de HLS-playlist of de DASH-manifest over. De `preview` slaan we over: dat is
+ * een stille 96p-clip voor de seek-balk, geen video.
+ */
+export function collectRedditVideoLinks(html: string, pageUrl: string): VideoLink[] {
+	if (!html || !REDDIT_SIGNAL.test(html)) return [];
+
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, 'text/html');
+	} catch {
+		return [];
+	}
+
+	const links: VideoLink[] = [];
+	doc.querySelectorAll('[packaged-media-json]').forEach(player => {
+		// Eén link per speler: de resoluties zijn dezelfde video in verschillende maten.
+		const [url] = redditPackagedMp4s(player.getAttribute('packaged-media-json'));
+		if (!url) return;
+		const poster = absoluteHttpUrl(player.getAttribute('poster') || '', pageUrl) || undefined;
+		links.push({ url, poster, source: 'page' });
+	});
+	if (links.length > 0) return dedupe(links);
+
+	const candidates: string[] = [];
+	doc.querySelectorAll('shreddit-player, [data-hls-url], [data-mpd-url]').forEach(player => {
+		for (const name of ['src', 'data-hls-url', 'data-mpd-url', 'preview']) {
+			const value = player.getAttribute(name);
+			if (value && !/(?:CMAF|DASH)_96\.mp4/i.test(value)) candidates.push(value);
+		}
+	});
+	addPageLinks(links, candidates, pageUrl);
+	return dedupe(links);
+}
+
 /** Alle videolinks die bij deze pagina horen: eerst de tweet zelf, dan wat de inhoud aanwijst. */
 export async function resolveVideoLinks(context: VideoLinkContext): Promise<VideoLink[]> {
 	const links: VideoLink[] = [];
@@ -235,11 +326,15 @@ export async function resolveVideoLinks(context: VideoLinkContext): Promise<Vide
 		}
 	}
 
+	// Reddit: de mp4's staan in een attribuut op de speler in de volledige pagina-HTML. De
+	// geëxtraheerde inhoud (`contentHtml`) bevat dat attribuut niet.
+	links.push(...collectRedditVideoLinks(context.fullHtml || context.contentHtml || '', context.pageUrl));
+
 	if (context.contentHtml) {
 		links.push(...collectPageVideoLinks(context.contentHtml, context.pageUrl, context.metaTags));
 	}
 
-	return dedupe(links);
+	return preferRedditMp4(dedupe(links));
 }
 
 /**
@@ -266,6 +361,28 @@ export async function appendVideoLinksFromPage(
 		debugLog('Video links', 'Overgeslagen:', error instanceof Error ? error.message : error);
 		return markdown;
 	}
+}
+
+/**
+ * Staat er een mp4 van v.redd.it tussen, laat dan de HLS-playlist en de DASH-manifest van die host
+ * vallen: dat zijn dezelfde video in een vorm die je later niet zonder speler kunt openen.
+ */
+function preferRedditMp4(links: VideoLink[]): VideoLink[] {
+	const redditLinks = links.filter(link => isRedditMediaHost(link.url));
+	if (!redditLinks.some(link => isMp4Url(link.url))) return links;
+	return links.filter(link => !isRedditMediaHost(link.url) || isMp4Url(link.url));
+}
+
+function isRedditMediaHost(url: string): boolean {
+	try {
+		return new URL(url).hostname.toLowerCase() === 'v.redd.it';
+	} catch {
+		return false;
+	}
+}
+
+function isMp4Url(url: string): boolean {
+	return safePath(url).endsWith('.mp4');
 }
 
 function addPageLinks(links: VideoLink[], candidates: string[], pageUrl: string): void {

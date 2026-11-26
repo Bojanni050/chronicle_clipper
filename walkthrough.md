@@ -1,5 +1,11 @@
 # Walkthrough
 
+## 2026-11-26 (Video's van Reddit)
+
+- Findings: Een geclipte Reddit-post met video (`r/vibecoding/comments/1y59rf5`) gaf alleen de tekst. Reddit speelt via MediaSource (het `<video>` krijgt een `blob:`-adres) en bewaart de mp4's in `playbackMp4s.permutations` van het `packaged-media-json`-attribuut op `<shreddit-player>`. Dat attribuut zit niet in de geëxtraheerde inhoud en de postpagina heeft geen `og:video`, dus de bestaande detectie (`contentHtml`, meta-tags) zag niets.
+- Conclusions: De mp4's zijn wel te lezen uit `fullHtml`, de volledige pagina-HTML die de clipper al ophaalt. Eén mp4 per speler is genoeg (de permutaties zijn dezelfde video in andere maten); HLS/MPD alleen als er geen mp4 is, want die openen niet zonder speler. Parsen gebeurt alleen als de HTML een Reddit-signaal bevat. Buiten scope: posts die naar een externe speler (YouTube, Streamable) linken.
+- Actions: `src/utils/video-links.ts` kreeg `redditPackagedMp4s`, `collectRedditVideoLinks`, `preferRedditMp4`, `isRedditMediaHost`, `isMp4Url`, `REDDIT_SIGNAL` en `fullHtml` in `VideoLinkContext`; `resolveVideoLinks` zet de Reddit-links vóór de generieke pagina-links; `src/utils/content-extractor.ts` geeft `fullHtml` mee; vijf tests in `src/utils/video-links.test.ts`; `src/manifest.chrome.json` naar 1.7.1.7; `CHRONICLE-FORK.md` aangevuld. `npx vitest run src/utils/video-links.test.ts` (27 groen) en `npm run build:chrome` (webpack ok) gedraaid; validated.
+
 ## 2026-11-26 (Videolinks uit tweets)
 
 - Findings: Een geclipte tweet met video bevatte geen verwijzing naar die video. X levert in de DOM alleen een `<video>` met een `blob:`-adres (of niets) en bewaart de echte mp4 in script-JSON, die de content-extractie weggooit. De statuspagina heeft ook geen `og:video`. Daardoor kwam alleen de tekst in de notitie.
