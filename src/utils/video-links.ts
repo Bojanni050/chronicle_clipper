@@ -51,8 +51,25 @@ export interface VideoLinkContext {
 	timeoutMs?: number;
 }
 
+export interface VideoLinkOptions {
+	/**
+	 * Zet een direct videobestand als kaal adres neer in plaats van als gelabelde link. Zett maakt
+	 * van een kaal adres een speler; Obsidian laat het als link zien. Alleen voor `.mp4`, `.webm`,
+	 * `.ogv`, `.mov` en `.m4v` — een YouTube-adres is geen bestand.
+	 */
+	embed?: boolean;
+}
+
+export interface AppendVideoLinkOptions extends VideoLinkOptions {
+	/** Boven de clip in plaats van eronder. Reddit zet de media ook boven de tekst. */
+	position?: 'top' | 'bottom';
+}
+
 const SYNDICATION_ENDPOINT = 'https://cdn.syndication.twimg.com/tweet-result';
 const DEFAULT_TIMEOUT_MS = 5000;
+
+/** Een adres dat rechtstreeks naar een videobestand wijst, niet naar een pagina met een speler. */
+const DIRECT_VIDEO_PATH = /\.(mp4|m4v|webm|ogv|mov)$/;
 
 /** Zegt of deze HTML een Reddit-speler kan bevatten; scheelt een DOMParser over elke pagina. */
 const REDDIT_SIGNAL = /packaged-media-json|v\.redd\.it/i;
@@ -135,7 +152,9 @@ export function formatDuration(ms: number | undefined): string {
 	return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
-export function videoLinkMarkdown(link: VideoLink, index?: number): string {
+export function videoLinkMarkdown(link: VideoLink, index?: number, options: VideoLinkOptions = {}): string {
+	if (options.embed && isDirectVideoFile(link.url)) return link.url;
+
 	const duration = formatDuration(link.durationMs);
 	const provider = link.provider ? ` (${link.provider})` : '';
 	const label = `Video${index ? ` ${index}` : ''}${provider}${duration ? ` (${duration})` : ''}`;
@@ -444,25 +463,37 @@ export async function resolveVideoLinks(context: VideoLinkContext): Promise<Vide
 }
 
 /**
- * Zet de videolinks onder de Markdown, tenzij het adres er al in staat.
+ * Zet de videolinks bij de Markdown, tenzij het adres er al in staat.
+ * Standaard onder de clip; `position: 'top'` zet ze erboven, zoals Reddit zijn media toont.
  * Geeft de Markdown onveranderd terug als er niets toe te voegen valt.
  */
-export function appendVideoLinks(markdown: string, links: VideoLink[]): string {
+export function appendVideoLinks(
+	markdown: string,
+	links: VideoLink[],
+	options: AppendVideoLinkOptions = {}
+): string {
 	const fresh = dedupe(links).filter(link => link.url && !markdown.includes(link.url));
 	if (fresh.length === 0) return markdown;
 
-	const block = fresh.map((link, i) => videoLinkMarkdown(link, fresh.length > 1 ? i + 1 : undefined)).join('\n');
+	const block = fresh
+		.map((link, i) => videoLinkMarkdown(link, fresh.length > 1 ? i + 1 : undefined, options))
+		.join('\n');
+
+	if (options.position === 'top') {
+		return `${block}\n\n${markdown.trimStart()}`;
+	}
 	return `${markdown.trimEnd()}\n\n${block}`;
 }
 
 /** De variant die de content-extractie gebruikt: nooit gooien, een clip mag niet stukgaan op een video. */
 export async function appendVideoLinksFromPage(
 	markdown: string,
-	context: VideoLinkContext
+	context: VideoLinkContext,
+	options: AppendVideoLinkOptions = {}
 ): Promise<string> {
 	try {
 		const links = await resolveVideoLinks(context);
-		return appendVideoLinks(markdown, links);
+		return appendVideoLinks(markdown, links, options);
 	} catch (error) {
 		debugLog('Video links', 'Overgeslagen:', error instanceof Error ? error.message : error);
 		return markdown;
@@ -489,6 +520,10 @@ function isRedditMediaHost(url: string): boolean {
 
 function isMp4Url(url: string): boolean {
 	return safePath(url).endsWith('.mp4');
+}
+
+function isDirectVideoFile(url: string): boolean {
+	return DIRECT_VIDEO_PATH.test(safePath(url));
 }
 
 function addPageLinks(links: VideoLink[], candidates: string[], pageUrl: string): void {

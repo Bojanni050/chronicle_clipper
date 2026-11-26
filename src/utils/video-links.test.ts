@@ -317,6 +317,21 @@ describe('appendVideoLinks', () => {
 		]);
 		expect(result).toBe(`tekst\n\n[Video 1 (0:04)](${mp4Small})\n[Video 2 (1:05)](${mp4Large})`);
 	});
+
+	test('zet de link met position top boven de Markdown', () => {
+		const result = appendVideoLinks('De post-tekst.', [{ url: mp4Large, source: 'page' }], { position: 'top', embed: true });
+		expect(result).toBe(`${mp4Large}\n\nDe post-tekst.`);
+	});
+
+	test('zet met embed een videobestand als kaal adres neer', () => {
+		const result = appendVideoLinks('tekst', [{ url: mp4Large, durationMs: 4200, source: 'page' }], { embed: true });
+		expect(result).toBe(`tekst\n\n${mp4Large}`);
+	});
+
+	test('laat een externe speler ook met embed gelabeld', () => {
+		const result = appendVideoLinks('tekst', [{ url: 'https://youtu.be/abc', provider: 'YouTube', source: 'page' }], { embed: true });
+		expect(result).toBe('tekst\n\n[Video (YouTube)](https://youtu.be/abc)');
+	});
 });
 
 describe('resolveVideoLinks', () => {

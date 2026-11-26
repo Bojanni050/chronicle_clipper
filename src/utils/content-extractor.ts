@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { AnyHighlightData, TextHighlightData, HighlightData, collapseGroupsForExport } from './highlighter';
 import { generalSettings } from './storage-utils';
 import { appendVideoLinksFromPage } from './video-links';
+import { hoistRedditPostMedia, isRedditPostUrl } from './reddit-media';
 import {
 	getElementByXPath,
 	wrapElementWithMark,
@@ -158,19 +159,32 @@ export async function initializePageContent(
 			content = processHighlights(content, highlights);
 		}
 
+		// Reddit's extractor plakt de post-media achter de tekst. Zet de afbeelding terug waar de
+		// pagina hem heeft — bovenaan — zodat de Markdown dezelfde volgorde heeft als reddit.com.
+		const isRedditPost = isRedditPostUrl(currentUrl);
+		if (isRedditPost && !selectedHtml) {
+			content = hoistRedditPostMedia(content);
+		}
+
 		const markdownBody = createMarkdownContent(content, currentUrl);
 
 		// Een tweet bewaart zijn video niet als adres in de DOM (blob:) en de echte mp4 staat in
 		// script-JSON die we weggooien. Zet de videolink daarom onder de clip; bij een selectie of
 		// een highlight-only clip slaan we dit over, want dan gaat het om de gekozen tekst.
+		// Reddit toont de media boven de tekst; daar hoort de link ook boven, en als kaal adres
+		// zodat Zett er een speler van maakt.
 		let bodyWithVideo = markdownBody;
 		if (!selectedHtml && generalSettings.highlightBehavior !== 'replace-content') {
-			bodyWithVideo = await appendVideoLinksFromPage(markdownBody, {
-				pageUrl: currentUrl,
-				contentHtml: content,
-				fullHtml,
-				metaTags,
-			});
+			bodyWithVideo = await appendVideoLinksFromPage(
+				markdownBody,
+				{
+					pageUrl: currentUrl,
+					contentHtml: content,
+					fullHtml,
+					metaTags,
+				},
+				isRedditPost ? { position: 'top', embed: true } : {}
+			);
 		}
 
 		const highlightsData = collapseGroupsForExport(highlights, c => createMarkdownContent(c, currentUrl));

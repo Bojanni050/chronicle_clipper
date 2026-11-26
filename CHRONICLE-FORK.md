@@ -216,3 +216,26 @@ uit de volledige pagina-HTML die de clipper al ophaalt (`fullHtml`).
   YouTube-linkpost, titel-link als terugval, linkpost naar een gewone pagina, spelernaam in het
   label, tweet-video uit een linkpost, tweet zonder video); 33 tests groen,
   `npm run build:chrome` ok.
+
+## Media boven de tekst (2026-11-26)
+
+- **Probleem**: een geclipte Reddit-post zette de afbeelding onder de tekst, terwijl reddit.com hem
+  bovenaan toont; de video van de post kwam helemaal niet mee. Oorzaak van de volgorde zit in
+  defuddles Reddit-extractor: `getPostContent()` geeft `textBody + mediaBody` terug en plakt
+  daarmee `#post-image` achter de tekst. De video staat alleen in `<shreddit-player>` en werd door
+  `collectRedditVideoLinks` wel gevonden, maar als gelabelde link onderaan gezet — en een gelabelde
+  link maakt Zett niet tot speler (alleen een kaal adres of `![](url)`).
+- **Keuze**: de volgorde repareren op de geëxtraheerde HTML, vóór `createMarkdownContent`, in plaats
+  van de Markdown achteraf herschrijven. Dan klopt de volgorde ook in de `contentHtml`-variabele en
+  in de beeldarchivering, en de reparatie is één DOM-verplaatsing. Alleen op een Reddit-post-URL
+  (`/comments/`) en alleen binnen `div.reddit.post`, want `.post-content` bestaat ook bij andere
+  extractors. Een kaal adres is gekozen boven `![](url)`: Zett maakt er een speler van, Obsidian
+  laat het als werkende link zien. Externe spelers (YouTube, Vimeo) blijven gelabeld — dat is geen
+  bestand — maar staan bij een Reddit-post ook bovenaan.
+- **Actions**: `src/utils/reddit-media.ts` toegevoegd (`isRedditPostUrl`, `hoistRedditPostMedia`);
+  `src/utils/video-links.ts` kreeg `embed` en `position` (`VideoLinkOptions`,
+  `AppendVideoLinkOptions`, `DIRECT_VIDEO_PATH`, `isDirectVideoFile`);
+  `src/utils/content-extractor.ts` hoogt de media vóór de Markdown-conversie en geeft Reddit-posts
+  `{ position: 'top', embed: true }` mee; `src/utils/reddit-media.test.ts` (6 tests) en vier extra
+  tests in `src/utils/video-links.test.ts`; `src/manifest.chrome.json` naar 1.7.2.0. 45 tests groen,
+  `npm run build:chrome` ok.
