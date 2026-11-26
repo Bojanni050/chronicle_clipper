@@ -1397,9 +1397,9 @@ async function handleClipObsidian(destination?: ClipDestination): Promise<void> 
 			? (await memoizedExtractPageContent(currentTabId).catch(() => null))?.fullHtml
 			: undefined;
 		const clipResult = await saveClip(fileContent, noteName, tabInfo.url, pageHtml, destination);
-		const hasMediaLine = !!clipResult && clipResult.archived + clipResult.failed > 0;
+		const hasMediaLine = !!clipResult && clipResult.archived + clipResult.videos + clipResult.failed > 0;
 		if (clipResult && hasMediaLine) {
-			showClipError(mediaSummary(clipResult.archived, clipResult.failed));
+			showClipError(mediaSummary(clipResult.archived, clipResult.failed, clipResult.videos));
 		}
 		await incrementStat('addToObsidian', selectedVault, path, tabInfo.url, tabInfo.title);
 

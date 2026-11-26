@@ -239,3 +239,23 @@ uit de volledige pagina-HTML die de clipper al ophaalt (`fullHtml`).
   `{ position: 'top', embed: true }` mee; `src/utils/reddit-media.test.ts` (6 tests) en vier extra
   tests in `src/utils/video-links.test.ts`; `src/manifest.chrome.json` naar 1.7.2.0. 45 tests groen,
   `npm run build:chrome` ok.
+
+## Video's bij het clippen bewaren (2026-11-26)
+
+- **Probleem**: een geclipte Reddit-video stond als adres in de notitie, en zo'n adres is
+  ondertekend (`e=` in de query) en verloopt binnen uren tot een dag. De speler ging daarna dood;
+  de Save-knop in Zett werkt, maar is een handeling per clip. Zett's `/ingest/media` nam alleen
+  beeld aan, dus de clipper kon de bytes niet brengen.
+- **Keuze**: video's bij het clippen meteen naar Zett, door hetzelfde endpoint, met dezelfde regels
+  als beelden (https, geen privébereik, geen cookies, type uit de bytes) en de videogrens van 200
+  MB. De adressen komen uit de Markdown die de popup al maakte: een native speler levert een
+  `blob:`-bron en geen downloadbaar adres, dus de HTML heeft niets bruikbaars. Een kaal adres,
+  `![](…)` en `[url](url)` worden vervangen; een gelabelde link blijft, want dat label is een keuze
+  van de gebruiker. Wat niet lukt wordt een gat met een reden, nooit stil weggelaten. Standaard
+  aan, max 3 video's, 180 s per stuk: een clip mag niet stukgaan op een video.
+- **Actions**: `src/utils/video-archive.ts` (nieuw: `isVideoFile`, `sniffVideoMime`,
+  `collectVideoUrls`, `archiveVideos`, `rewriteVideoMarkdown`) met 13 tests; `src/utils/zett-note-creator.ts`
+  (`archiveVideos` na de beelden, `ZettClipResult.videos`); instelling `archiveVideos` in
+  `types.ts`, `storage-utils.ts`, `cli-stubs.ts`, `settings.html`, `general-settings.ts` en de
+  locales en/nl; `mediaSummary` noemt video's apart; `src/manifest.chrome.json` naar 1.7.3.0.
+  32 tests groen, `npm run build:chrome` ok.

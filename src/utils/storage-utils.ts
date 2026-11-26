@@ -10,6 +10,7 @@ export let generalSettings: Settings = {
 	clipDestination: 'chronicle',
 	zettUrl: 'http://127.0.0.1:4590',
 	archiveImages: true,
+	archiveVideos: true,
 	betaFeatures: false,
 	legacyMode: false,
 	silentOpen: false,
@@ -75,6 +76,8 @@ interface StorageData {
 		zettUrl?: string;
 		/** Beelden van de pagina door Zett laten bewaren (standaard aan). */
 		archiveImages?: boolean;
+		/** Video's uit de clip door Zett laten bewaren (standaard aan). */
+		archiveVideos?: boolean;
 		/** Oude namen, vóór de rebrandings; alleen nog gelezen. */
 		mindstackUrl?: string;
 		mindloomUrl?: string;
@@ -135,6 +138,7 @@ export async function loadSettings(): Promise<Settings> {
 		clipDestination: 'chronicle',
 		zettUrl: 'http://127.0.0.1:4590',
 		archiveImages: true,
+		archiveVideos: true,
 		showMoreActionsButton: false,
 		betaFeatures: false,
 		legacyMode: false,
@@ -204,6 +208,7 @@ export async function loadSettings(): Promise<Settings> {
 			: 'chronicle',
 		zettUrl: data.general_settings?.zettUrl || data.general_settings?.mindloomUrl || data.general_settings?.mindstackUrl || defaultSettings.zettUrl,
 		archiveImages: data.general_settings?.archiveImages ?? defaultSettings.archiveImages,
+		archiveVideos: data.general_settings?.archiveVideos ?? defaultSettings.archiveVideos,
 		showMoreActionsButton: data.general_settings?.showMoreActionsButton ?? defaultSettings.showMoreActionsButton,
 		betaFeatures: data.general_settings?.betaFeatures ?? defaultSettings.betaFeatures,
 		legacyMode: data.general_settings?.legacyMode ?? defaultSettings.legacyMode,

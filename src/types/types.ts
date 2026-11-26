@@ -85,6 +85,8 @@ export interface Settings {
 	zettUrl: string;
 	/** Beelden van de pagina door Zett laten bewaren in plaats van als hotlink te laten staan. */
 	archiveImages: boolean;
+	/** Video's die in de clip staan door Zett laten bewaren in plaats van naar het (vaak tijdelijke) adres te laten wijzen. */
+	archiveVideos: boolean;
 	showMoreActionsButton: boolean;
 	betaFeatures: boolean;
 	legacyMode: boolean;

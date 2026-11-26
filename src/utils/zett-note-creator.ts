@@ -1,5 +1,6 @@
 import { generalSettings, saveSettings } from './storage-utils';
 import { archiveImages, collectImageUrls, prioritizeImageUrls, rewriteMarkdown } from './media-archive';
+import { archiveVideos, collectVideoUrls, rewriteVideoMarkdown } from './video-archive';
 
 /**
  * Stuurt een clip naar Zett's lokale luisteraar. Naar het model van
@@ -101,6 +102,8 @@ export interface ZettClipResult {
 	/** Hoeveel beelden Zett bewaarde, en hoeveel er niet opgehaald konden worden. */
 	archived: number;
 	failed: number;
+	/** Hoeveel video's er bewaard zijn (dezelfde clip kan er een paar hebben). */
+	videos: number;
 }
 
 /**
@@ -110,7 +113,9 @@ export interface ZettClipResult {
  *
  * Met `pageHtml` worden eerst de beelden van de pagina opgehaald en bij Zett
  * bewaard, en verwijst de Markdown naar `zett-media://<hash>` in plaats van
- * naar de hotlink. Wat niet lukt wordt een gat met een reden.
+ * naar de hotlink. Wat niet lukt wordt een gat met een reden. Video's die als
+ * adres in de Markdown staan gaan dezelfde weg: die bytes zijn vaak ondertekend
+ * en verlopen, dus een clip zonder bewaarde video is na een dag een dode speler.
  */
 export async function saveToZett(
 	fileContent: string,
@@ -121,12 +126,15 @@ export async function saveToZett(
 	let content = fileContent;
 	let media: string[] | undefined;
 	let mediaGaps: { url: string; reason: string }[] | undefined;
-	let result: ZettClipResult | null = null;
+	let archivedImages = 0;
+	let archivedVideos = 0;
+	let failed = 0;
 
 	let connection = await resolveZettConnection();
 
-	// Eerst de beelden, dan de clip: zo verwijst een opgeslagen clip nooit naar een beeld dat er
-	// niet is. Wat mislukt gaat als gat mee, zodat de notitie kan vertellen wat er ontbreekt.
+	// Eerst de beelden, dan de video's, dan de clip: zo verwijst een opgeslagen clip nooit naar
+	// media die er niet zijn. Wat mislukt gaat als gat mee, zodat de notitie kan vertellen wat er
+	// ontbreekt.
 	if (generalSettings.archiveImages && pageHtml) {
 		const urls = prioritizeImageUrls(collectImageUrls(pageHtml, url), content);
 		const archived = await archiveImages(urls, {
@@ -138,9 +146,35 @@ export async function saveToZett(
 			content = rewriteMarkdown(content, archived.mapping);
 			media = archived.media;
 			mediaGaps = archived.gaps;
-			result = { archived: archived.media.length, failed: archived.gaps.length };
+			archivedImages = archived.media.length;
+			failed += archived.gaps.length;
 		}
 	}
+
+	// De video's staan in de Markdown die de popup al maakte (de clipper zet een Reddit-video
+	// bovenaan als kaal adres), niet in de HTML van de pagina: een native speler is een `blob:`-bron
+	// en levert geen downloadbaar adres op.
+	if (generalSettings.archiveVideos) {
+		const urls = collectVideoUrls(content, url);
+		if (urls.length) {
+			const archived = await archiveVideos(urls, {
+				baseUrl: connection.baseUrl,
+				token: connection.token,
+				originUrl: url,
+			});
+			if (archived.mapping.size || archived.gaps.length) {
+				content = rewriteVideoMarkdown(content, archived.mapping);
+				media = [...(media ?? []), ...archived.media];
+				mediaGaps = [...(mediaGaps ?? []), ...archived.gaps];
+				archivedVideos = archived.media.length;
+				failed += archived.gaps.length;
+			}
+		}
+	}
+
+	const result: ZettClipResult | null = archivedImages || archivedVideos || failed
+		? { archived: archivedImages, failed, videos: archivedVideos }
+		: null;
 
 	const payload = {
 		content,

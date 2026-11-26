@@ -221,6 +221,7 @@ export function initializeGeneralSettings(): void {
 		initializeLegacyModeToggle();
 		initializeSilentOpenToggle();
 		initializeArchiveImagesToggle();
+		initializeArchiveVideosToggle();
 		initializeVaultInput();
 		initializeOpenBehaviorDropdown();
 		initializeKeyboardShortcuts();
@@ -324,6 +325,7 @@ function saveSettingsFromForm(): void {
 	const legacyModeToggle = document.getElementById('legacy-mode-toggle') as HTMLInputElement;
 	const silentOpenToggle = document.getElementById('silent-open-toggle') as HTMLInputElement;
 	const archiveImagesToggle = document.getElementById('archive-images-toggle') as HTMLInputElement;
+	const archiveVideosToggle = document.getElementById('archive-videos-toggle') as HTMLInputElement;
 	const highlighterToggle = document.getElementById('highlighter-toggle') as HTMLInputElement;
 	const alwaysShowHighlightsToggle = document.getElementById('highlighter-visibility') as HTMLInputElement;
 	const highlightBehaviorSelect = document.getElementById('highlighter-behavior') as HTMLSelectElement;
@@ -339,6 +341,7 @@ function saveSettingsFromForm(): void {
 		legacyMode: legacyModeToggle?.checked ?? generalSettings.legacyMode,
 		silentOpen: silentOpenToggle?.checked ?? generalSettings.silentOpen,
 		archiveImages: archiveImagesToggle?.checked ?? generalSettings.archiveImages,
+		archiveVideos: archiveVideosToggle?.checked ?? generalSettings.archiveVideos,
 		highlighterEnabled: highlighterToggle?.checked ?? generalSettings.highlighterEnabled,
 		alwaysShowHighlights: alwaysShowHighlightsToggle?.checked ?? generalSettings.alwaysShowHighlights,
 		highlightBehavior: highlightBehaviorSelect?.value ?? generalSettings.highlightBehavior
@@ -423,6 +426,13 @@ function initializeSilentOpenToggle(): void {
 function initializeArchiveImagesToggle(): void {
 	initializeSettingToggle('archive-images-toggle', generalSettings.archiveImages, (checked) => {
 		saveSettings({ ...generalSettings, archiveImages: checked });
+	});
+}
+
+/** Video's uit de clip door Zett laten bewaren in plaats van naar het adres te laten wijzen. */
+function initializeArchiveVideosToggle(): void {
+	initializeSettingToggle('archive-videos-toggle', generalSettings.archiveVideos, (checked) => {
+		saveSettings({ ...generalSettings, archiveVideos: checked });
 	});
 }
 

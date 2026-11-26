@@ -265,12 +265,20 @@ export function rewriteMarkdown(markdown: string, mapping: Map<string, string>):
 }
 
 /** De regel onder de knop, in de taal van de gebruiker (de rest van de fork doet dit ook zo). */
-export function mediaSummary(archived: number, failed: number): string {
+export function mediaSummary(archived: number, failed: number, videos = 0): string {
 	const dutch = typeof navigator !== 'undefined' && (navigator.language || '').toLowerCase().startsWith('nl');
-	if (dutch) {
-		return failed
-			? `${archived} afbeeldingen bewaard, ${failed} niet opgehaald`
-			: `${archived} afbeeldingen bewaard`;
-	}
-	return failed ? `${archived} images saved, ${failed} not fetched` : `${archived} images saved`;
+	const saved = (() => {
+		const videoText = videos === 1 ? '1 video' : `${videos} ${dutch ? "video's" : 'videos'}`;
+		if (!videos) {
+			return dutch ? `${archived} afbeeldingen bewaard` : `${archived} images saved`;
+		}
+		if (!archived) {
+			return dutch ? `${videoText} bewaard` : `${videoText} saved`;
+		}
+		return dutch
+			? `${archived} afbeeldingen en ${videoText} bewaard`
+			: `${archived} images and ${videoText} saved`;
+	})();
+	if (!failed) return saved;
+	return dutch ? `${saved}, ${failed} niet opgehaald` : `${saved}, ${failed} not fetched`;
 }

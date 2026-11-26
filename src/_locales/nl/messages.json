@@ -1098,6 +1098,12 @@
 	"archiveImagesDescription": {
 		"message": "Haalt de afbeeldingen van de pagina op en laat Zett ze bewaren, zodat een beeld niet verdwijnt als de pagina verdwijnt. Wat niet op te halen is, wordt als gat gemeld met de reden (bijvoorbeeld HTTP 403)."
 	},
+	"archiveVideos": {
+		"message": "Bewaar de video's van de clip in Zett"
+	},
+	"archiveVideosDescription": {
+		"message": "Haalt de video's op waar de clip naar wijst en laat Zett ze bewaren. Een videoadres van bijvoorbeeld Reddit is ondertekend en verloopt, dus zonder dit is de speler in de notitie binnen een dag dood. Wat niet op te halen is, wordt als gat gemeld met de reden."
+	},
 	"version": {
 		"message": "Versie"
 	}

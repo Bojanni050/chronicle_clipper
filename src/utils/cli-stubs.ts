@@ -13,6 +13,7 @@ export const generalSettings: Settings = {
 	zettUrl: 'http://127.0.0.1:4590',
 	// De CLI knipt zonder browser: er valt geen beeld op te halen.
 	archiveImages: false,
+	archiveVideos: false,
 	betaFeatures: false,
 	legacyMode: false,
 	silentOpen: false,

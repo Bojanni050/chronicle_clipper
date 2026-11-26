@@ -244,4 +244,16 @@ describe('mediaSummary', () => {
 		expect(mediaSummary(1, 1)).toBe('1 images saved, 1 not fetched');
 		vi.unstubAllGlobals();
 	});
+
+	test('noemt een video apart, en alleen een video als er geen beeld bij was', () => {
+		vi.stubGlobal('navigator', { language: 'nl-NL' });
+		expect(mediaSummary(0, 0, 1)).toBe('1 video bewaard');
+		expect(mediaSummary(2, 0, 1)).toBe('2 afbeeldingen en 1 video bewaard');
+		expect(mediaSummary(2, 0, 3)).toBe("2 afbeeldingen en 3 video's bewaard");
+		expect(mediaSummary(0, 1, 1)).toBe('1 video bewaard, 1 niet opgehaald');
+		vi.stubGlobal('navigator', { language: 'en-US' });
+		expect(mediaSummary(0, 0, 2)).toBe('2 videos saved');
+		expect(mediaSummary(1, 0, 1)).toBe('1 images and 1 video saved');
+		vi.unstubAllGlobals();
+	});
 });
