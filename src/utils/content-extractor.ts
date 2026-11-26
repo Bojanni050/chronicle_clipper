@@ -7,6 +7,7 @@ import { debugLog } from './debug';
 import dayjs from 'dayjs';
 import { AnyHighlightData, TextHighlightData, HighlightData, collapseGroupsForExport } from './highlighter';
 import { generalSettings } from './storage-utils';
+import { appendVideoLinksFromPage } from './video-links';
 import {
 	getElementByXPath,
 	wrapElementWithMark,
@@ -159,6 +160,18 @@ export async function initializePageContent(
 
 		const markdownBody = createMarkdownContent(content, currentUrl);
 
+		// Een tweet bewaart zijn video niet als adres in de DOM (blob:) en de echte mp4 staat in
+		// script-JSON die we weggooien. Zet de videolink daarom onder de clip; bij een selectie of
+		// een highlight-only clip slaan we dit over, want dan gaat het om de gekozen tekst.
+		let bodyWithVideo = markdownBody;
+		if (!selectedHtml && generalSettings.highlightBehavior !== 'replace-content') {
+			bodyWithVideo = await appendVideoLinksFromPage(markdownBody, {
+				pageUrl: currentUrl,
+				contentHtml: content,
+				metaTags,
+			});
+		}
+
 		const highlightsData = collapseGroupsForExport(highlights, c => createMarkdownContent(c, currentUrl));
 
 		const noteName = sanitizeFileName(title);
@@ -166,7 +179,7 @@ export async function initializePageContent(
 		const currentVariables = buildVariables({
 			title,
 			author,
-			content: markdownBody,
+			content: bodyWithVideo,
 			contentHtml: content,
 			url: currentUrl,
 			fullHtml,

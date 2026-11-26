@@ -151,3 +151,31 @@ meteen daar op. De instelling blijft bepalen wat de hoofdknop doet.
   `archive`.
 - **`src/manifest.chrome.json`**: versie 1.7.1.5.
 - **Tests**: `clip-destination.test.ts` dekt de override in beide richtingen en de labels in NL en EN.
+
+## Videolinks uit tweets (2026-11-26)
+
+Een tweet met een video kwam zonder verwijzing in de notitie terecht. X zet in de DOM een
+`<video>` met een `blob:`-adres (of helemaal geen `src`) en bewaart de echte mp4 alleen in zijn
+bootstrap-JSON; de content-extractie laat `<script>` weg, en de statuspagina heeft geen
+`og:video`-meta. De clip bevatte dus de tekst van de tweet, maar geen enkele manier om de video
+terug te vinden.
+
+- **`src/utils/video-links.ts`** (nieuw): `tweetIdFromUrl` leest het statusnummer uit x.com- en
+  twitter.com-adressen (`/user/status/…`, `/i/status/…`, `/i/web/status/…`, `/statuses/…`, met
+  `/video/1` of query erachter). `resolveTweetVideos` vraagt
+  `https://cdn.syndication.twimg.com/tweet-result?id=…&token=4` op en `pickBestMp4` kiest de
+  mp4-variant met de hoogste bitrate (HLS-playlists vallen af). `collectPageVideoLinks` doet hetzelfde
+  voor gewone pagina's: `<video src>`, `<source src>` en de meta-tags `og:video`,
+  `og:video:url`, `og:video:secure_url` en `twitter:player:stream`.
+- **`src/utils/content-extractor.ts`**: `initializePageContent` zet de links onder `{{content}}`
+  als `[Video (0:04)](https://video.twimg.com/…mp4)` (bij meerdere video's genummerd). Dat gebeurt
+  alleen bij een volledige clip: bij een tekstselectie of `replace-content`-highlight blijft de
+  inhoud zoals hij is. Mislukt het ophalen, dan gaat de clip gewoon door — een video is geen
+  voorwaarde. Staat het adres al in de Markdown (bijvoorbeeld omdat Defuddle de `<video>` bewaarde),
+  dan wordt er niets toegevoegd.
+- **Alleen linken, niet bewaren**: Zett's `/ingest/media` accepteert nu alleen beelden en 25 MB per
+  bestand (zie `docs/media-archivering.md` daar). De bytes archiveren vraagt een wijziging aan de
+  Zett-kant en een ruimer budget; dit is bewust een aparte stap.
+- **`src/manifest.chrome.json`**: versie 1.7.1.6.
+- **Tests**: `src/utils/video-links.test.ts` (adresherkenning, variantkeuze, duur, beide
+  API-vormen, pagina- en metavideo's, dedupe, idempotent toevoegen, genummerde video's).

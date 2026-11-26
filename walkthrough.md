@@ -1,0 +1,7 @@
+# Walkthrough
+
+## 2026-11-26 (Videolinks uit tweets)
+
+- Findings: Een geclipte tweet met video bevatte geen verwijzing naar die video. X levert in de DOM alleen een `<video>` met een `blob:`-adres (of niets) en bewaart de echte mp4 in script-JSON, die de content-extractie weggooit. De statuspagina heeft ook geen `og:video`. Daardoor kwam alleen de tekst in de notitie.
+- Conclusions: De publieke syndication-API (`cdn.syndication.twimg.com/tweet-result`) geeft de mp4-varianten wel, en de extensie mag die door haar host-permissies ophalen. Een gewone Markdown-link onderaan `{{content}}` is de kleinste oplossing die het probleem echt oplost; de bytes archiveren kan niet zonder Zett's media-endpoint te wijzigen (daar nu alleen beeld, 25 MB) en is een aparte stap. De link wordt alleen bij een volledige clip toegevoegd, zodat een tekstselectie of highlight-only clip niet wordt aangevuld met iets wat de gebruiker niet koos. Mislukken is stil: een clip mag nooit stukgaan op een video.
+- Actions: `src/utils/video-links.ts` toegevoegd (`tweetIdFromUrl`, `pickBestMp4`, `resolveTweetVideos`, `videosFromSyndication`, `collectPageVideoLinks`, `resolveVideoLinks`, `appendVideoLinks`, `appendVideoLinksFromPage`); `src/utils/content-extractor.ts` laat `initializePageContent` de links onder de Markdown zetten; `src/utils/video-links.test.ts` met 22 tests; `src/manifest.chrome.json` naar 1.7.1.6; `CHRONICLE-FORK.md` aangevuld. `npx vitest run src/utils/video-links.test.ts` (22 groen) en `npm run build:chrome` (webpack ok) gedraaid; validated.
