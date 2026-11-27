@@ -259,3 +259,17 @@ uit de volledige pagina-HTML die de clipper al ophaalt (`fullHtml`).
   `types.ts`, `storage-utils.ts`, `cli-stubs.ts`, `settings.html`, `general-settings.ts` en de
   locales en/nl; `mediaSummary` noemt video's apart; `src/manifest.chrome.json` naar 1.7.3.0.
   32 tests groen, `npm run build:chrome` ok.
+
+### Galerij van een Reddit-post (2026-11-27)
+
+- **Probleem**: een galerijpost leverde alleen tekst op, zonder één beeld, terwijl de bibliotheek
+ 19 avatars en awards bevatte. Defuddle pakt bij Reddit alleen de tekst en `#post-image`; een
+  galerij heeft die id niet, en de beeldarchivering pakte daarna alles wat op de pagina stond.
+- **Keuze**: de galerijbeelden uit de volledige pagina-HTML halen en als blok boven de tekst
+  zetten, vóór de Markdown-conversie, met dezelfde regel als bij een enkel beeld. Alleen
+ `*.redd.it`-media, ontdubbeld op pad (breedtes), hooguit 20, en de avatar-/award-hosts uit de
+ archiefkandidaten. Ontbrekende beelden worden niet verzonnen: de galerij vult de extractie aan.
+- **Actions**: `src/utils/reddit-media.ts` (`collectRedditGalleryImages`, `isRedditPageChromeImage`,
+ `hoistRedditPostMedia(html, gallery)`); `content-extractor.ts` geeft `fullHtml` mee;
+ `zett-note-creator.ts` filtert de chrome; 8 tests erbij; manifest naar 1.7.4.0. 54 tests groen,
+ volledige suite 309 groen (6 bekende CRLF-fixtures), build ok.

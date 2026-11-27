@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 import { AnyHighlightData, TextHighlightData, HighlightData, collapseGroupsForExport } from './highlighter';
 import { generalSettings } from './storage-utils';
 import { appendVideoLinksFromPage } from './video-links';
-import { hoistRedditPostMedia, isRedditPostUrl } from './reddit-media';
+import { collectRedditGalleryImages, hoistRedditPostMedia, isRedditPostUrl } from './reddit-media';
 import {
 	getElementByXPath,
 	wrapElementWithMark,
@@ -161,9 +161,12 @@ export async function initializePageContent(
 
 		// Reddit's extractor plakt de post-media achter de tekst. Zet de afbeelding terug waar de
 		// pagina hem heeft — bovenaan — zodat de Markdown dezelfde volgorde heeft als reddit.com.
+		// Een galerijpost heeft geen `#post-image`; die beelden staan alleen in de live DOM, dus
+		// halen we ze daar op en zetten we ze in dezelfde reeks bovenaan.
 		const isRedditPost = isRedditPostUrl(currentUrl);
 		if (isRedditPost && !selectedHtml) {
-			content = hoistRedditPostMedia(content);
+			const gallery = collectRedditGalleryImages(fullHtml);
+			content = hoistRedditPostMedia(content, gallery);
 		}
 
 		const markdownBody = createMarkdownContent(content, currentUrl);

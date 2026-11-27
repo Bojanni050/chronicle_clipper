@@ -1,5 +1,6 @@
 import { generalSettings, saveSettings } from './storage-utils';
 import { archiveImages, collectImageUrls, prioritizeImageUrls, rewriteMarkdown } from './media-archive';
+import { isRedditPageChromeImage, isRedditPostUrl } from './reddit-media';
 import { archiveVideos, collectVideoUrls, rewriteVideoMarkdown } from './video-archive';
 
 /**
@@ -136,7 +137,12 @@ export async function saveToZett(
 	// media die er niet zijn. Wat mislukt gaat als gat mee, zodat de notitie kan vertellen wat er
 	// ontbreekt.
 	if (generalSettings.archiveImages && pageHtml) {
-		const urls = prioritizeImageUrls(collectImageUrls(pageHtml, url), content);
+		// Op een Reddit-post staan in de HTML ook de avatars en award-iconen van de pagina; die
+		// horen niet in de bibliotheek en duwen de echte post-beelden uit de limiet.
+		const candidates = isRedditPostUrl(url)
+			? collectImageUrls(pageHtml, url).filter(candidate => !isRedditPageChromeImage(candidate))
+			: collectImageUrls(pageHtml, url);
+		const urls = prioritizeImageUrls(candidates, content);
 		const archived = await archiveImages(urls, {
 			baseUrl: connection.baseUrl,
 			token: connection.token,
